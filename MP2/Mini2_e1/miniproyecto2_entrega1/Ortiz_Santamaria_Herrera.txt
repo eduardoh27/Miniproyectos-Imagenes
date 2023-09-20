@@ -97,7 +97,7 @@ plt.axis('Off')
 # Generamos  el histograma ignorando los valores distintos a 0
 Higado_values = Higado[Higado != 0].flatten()
 plt.subplot(122)
-plt.hist(Higado_values, bins=73)
+plt.hist(Higado_values, bins=255)
 plt.xlabel('Intensidad')
 plt.ylabel('Frecuencia')
 plt.title('Histograma del hígado')
@@ -131,7 +131,7 @@ plt.axis('Off')
 
 Higado_values_salt_pepper = Higado_salt_peper[Higado_salt_peper != 0].flatten()
 plt.subplot(222)
-plt.hist(Higado_values_salt_pepper, bins=100)
+plt.hist(Higado_values_salt_pepper, bins=255)
 plt.xlabel('Intensidad')
 plt.ylabel('Frecuencia')
 plt.title('Histograma del hígado \n con ruido de sal y pimienta')
@@ -143,7 +143,7 @@ plt.axis('Off')
 
 Higado_values_gaussian = Higado_gaussian[Higado_gaussian != 0].flatten()
 plt.subplot(224)
-plt.hist(Higado_values_gaussian, bins=180)
+plt.hist(Higado_values_gaussian, bins=255)
 plt.xlabel('Intensidad')
 plt.ylabel('Frecuencia')
 plt.title('Histograma del hígado \n con ruido gaussiano')
@@ -245,12 +245,14 @@ def No_linear_filter(Im,filter_type,window,max_window=3):
 
     # YOUR CODE HERE
     if filter_type == 'median_adapt':
-        # realizar algoritmo según las diapositivas
-        new_image = mediana_adaptativo(Im,window,max_window)
+        new_image = adaptative_median_filter(Im,window,max_window)
     else:
-        new_image = estadistica_orden(Im, window, filter_type)
+        new_image = nonlinear_filter(Im, (window,window), filter_type)
     
     return new_image
+
+"""
+IMPLEMENTACION PROPIA:
 
 def estadistica_orden(f, w_size, filter_type):
     # Obtener m, n, a y b a partir de su definición
@@ -293,7 +295,7 @@ def estadistica_orden(f, w_size, filter_type):
 
 def mediana_adaptativo(f, w_size_pred, max_window):
     
-    # EDUARDO: Voy a colocar A y B para el caso de borde en el 
+    # Voy a colocar A y B para el caso de borde en el 
     # que se aumente la ventana al maximo en un pixel del borde
     M, N = max_window, max_window
     A, B = (M - 1)//2, (N - 1)//2
@@ -354,6 +356,90 @@ def mediana_adaptativo(f, w_size_pred, max_window):
     # Se retorna la matriz resultante 
     return g
 
+"""
+
+# Funciones tomadas del tutorial semana 7
+
+def nonlinear_filter(image, window_shape, type):
+    
+    # Se crea un arreglo en el que se almacena la imagen de salida
+    filtered_image = np.zeros(image.shape)
+    
+    # Definición de variables auxiliares
+    m, n = window_shape
+    a, b = (m - 1)//2, (n - 1)//2
+    
+    # Para cada pixel en el que se pueda centrar una ventana de las dimensiones dadas:
+    for i in range(a, image.shape[0] - a):
+        for j in range(b, image.shape[1] - b):
+            # Se seleccionan las intensidades que pertenecen a la ventana
+            window = image[i - a :i + a+1 , j - b: j + b +1]
+            # Se ordenan las intensidades de menor a mayor en un vector de longitud (nxm)
+            ordered_vector = np.sort(window.flatten())
+            if type == 'max':
+                # Se asigna al pixel central el último elemento del vector ordenado
+                filtered_image[i, j] = ordered_vector[-1]
+            elif type == 'min':
+                # Seasigna al pixel central el primer elemento del vector ordenado
+                filtered_image[i, j] = ordered_vector[0]
+            elif type == 'median':
+                # Se asigna al pixel central el elemento del medio del vector ordenado
+                filtered_image[i, j] = ordered_vector[len(ordered_vector) // 2]
+            else:
+                # Se arroja un error en el caso de que se introduzca por parámetro un filtro no soportado
+                raise Exception("Filter type not supported")
+    # Se retorna la imagen de salida
+
+    return filtered_image
+
+# Etapa A
+def stage_a(Z_min, Z_med, Z_max, Z_xy, S_xy, S_max):
+    # Se identifica si la mediana es mínimo o máximo también
+    if Z_min < Z_med < Z_max:
+        return stage_b(Z_min, Z_med, Z_max, Z_xy)
+    else:
+        # Se aumenta el tamaño de la ventana
+        S_xy += 2
+        # Se identifica si se alcanzó el tamaño máximo de ventana
+        if(S_xy <= S_max):
+            return stage_a(Z_min, Z_med, Z_max, Z_xy, S_xy, S_max)
+        else:
+            return Z_med
+
+def stage_b(Z_min, Z_med, Z_max, Z_xy):
+    # Se identifica si la intensidad del píxel central es mínima o máxima
+    if Z_min < Z_xy < Z_max:
+        return Z_xy
+    else:
+        return Z_med
+    
+def adaptative_median_filter(image, S_0, S_max):
+    # Variable auxiliar
+    a = (S_max - 1)//2
+    # Se crea un arreglo donde se almacenará la imagen de salida
+    image_aux=np.zeros((image.shape[0]+2*a,image.shape[1]+2*a))
+    image_aux[a:image.shape[0]+a,a:image.shape[1]+a]=image
+    output_image = image_aux.copy()
+    # Para cada pixel en el que se pueda centrar una ventana de tamaño máximo:
+    for i in range(a, image_aux.shape[0] - a):
+        for j in range(a, image_aux.shape[1] - a):
+            S_xy = S_0
+            # Se extraen las intensidades de la ventana
+            window = image_aux[i - a :i + a + 1, j - a: j + a + 1]
+            # Se ordenan dicahs intensidades en un vector
+            ordered_vector = np.sort(window.flatten())
+            # Se elige el mínimo, el máximo y la mediana de dicho vector
+            Z_min = ordered_vector[0]
+            Z_max = ordered_vector[-1]
+            Z_med = ordered_vector[len(ordered_vector) // 2]
+            # Se extrae la intensidad del píxel central
+            Z_xy = image_aux[i, j]
+            # Se ejecuta la etapa A descrita previemente
+            output_image[i, j] = stage_a(Z_min, Z_med, Z_max, Z_xy, S_xy, S_max)
+    # Se retorna la imagen de salida
+    return output_image[a:image.shape[0]+a,a:image.shape[1]+a]
+
+
 
 Max_salt_peper=No_linear_filter(salt_peper_axial,'max',3)
 Min_salt_peper=No_linear_filter(salt_peper_axial,'min',3)
@@ -395,7 +481,7 @@ original = original_vol[:,:,slice_axial]
 
 def PSNR(Im,Filtered):
     '''
-    :param Im: Imagen oringinal.
+    :param Im: Imagen original.
     :param Filtered: Imagen filtrada.
     '''
     # YOUR CODE HERE
