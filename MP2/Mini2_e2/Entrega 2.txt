@@ -1,0 +1,592 @@
+from glob import glob
+import os
+import nibabel as nib
+import numpy as np
+
+train_vols={} #diccionario de los volumenes de entrenamiento
+train_seg={} #diccionario de los volumenes de segmentacion de entrenamiento
+
+valid_vols={} #diccionario de los volumenes de validacion
+valid_seg={} #diccionario de los volumenes de segmentacion de validacion
+
+test_vols={} #diccionario de los volumenes de test
+test_seg={} #diccionario de los volumenes de segmentacion de test
+
+
+vols_path_train=glob(os.path.join('DB','train','*.nii.gz')) #lista de paths de los volumenes de train
+# YOUR CODE HERE
+for path in vols_path_train:
+    tipo, paciente = path.split('\\')[-1].split('.')[0].split('-')
+    if tipo == 'volume':
+        train_vols[paciente] = nib.load(path).get_fdata()
+    elif tipo == 'segmentation':
+        train_seg[paciente] = nib.load(path).get_fdata()
+
+vols_path_valid=glob(os.path.join('DB','valid','*.nii.gz')) #lista de paths de los volumenes de train
+# YOUR CODE HERE
+for path in vols_path_valid:
+    tipo, paciente = path.split('\\')[-1].split('.')[0].split('-')
+    if tipo == 'volume':
+        valid_vols[paciente] = nib.load(path).get_fdata()
+    elif tipo == 'segmentation':
+        valid_seg[paciente] = nib.load(path).get_fdata()
+
+vols_path_test=glob(os.path.join('DB','test','*.nii.gz')) #lista de paths de los volumenes de train
+# YOUR CODE HERE
+for path in vols_path_test:
+    tipo, paciente = path.split('\\')[-1].split('.')[0].split('-')
+    if tipo == 'volume':
+        test_vols[paciente] = nib.load(path).get_fdata()
+    elif tipo == 'segmentation':
+        test_seg[paciente] = nib.load(path).get_fdata()
+
+
+assert len(train_vols.keys())==3, f'Los volumenes en entrenamiento deberian ser 3 y son {len(train_vols.keys())}'
+assert len(train_seg.keys())==3, f'Los volumenes de segmentacion en entrenamiento deberian ser 3 y son {len(train_seg.keys())}'
+assert train_seg['1'].shape[0]==512, f'El volumen 1 no se encuentra en la llave 1'
+assert np.isclose(np.sum(train_seg['1']),658167,0.01), f'El volumen de segmentacion 1 no se encuentra en la llave 1'
+assert np.isclose(np.sum(valid_seg['10']),2905986,0.01), f'El volumen de segmentacion 10 no se encuentra en la llave 10' 
+
+
+keys_train=train_seg.keys()
+keys_valid=valid_seg.keys()
+keys_test=test_seg.keys()
+
+labels_train=[]
+for i in keys_train:
+    labels_train.append(np.unique(train_seg[i]))
+labels_train=np.unique(labels_train)
+
+labels_valid=[]
+for i in keys_valid:
+    labels_valid.append(np.unique(valid_seg[i]))
+labels_valid=np.unique(labels_valid)
+
+labels_test=[]
+for i in keys_test:
+    labels_test.append(np.unique(test_seg[i]))
+labels_test=np.unique(labels_test)
+
+
+label_0_train=0
+label_1_train=0
+label_2_train=0
+
+label_0_valid=0
+label_1_valid=0
+label_2_valid=0
+
+label_0_test=0
+label_1_test=0
+label_2_test=0
+
+for i in keys_train:
+    label_0_train+=np.sum(train_seg[i]==0)
+    label_1_train+=np.sum(train_seg[i]==1)
+    label_2_train+=np.sum(train_seg[i]==2)
+for i in keys_valid:
+    label_0_valid+=np.sum(valid_seg[i]==0)
+    label_1_valid+=np.sum(valid_seg[i]==1)
+    label_2_valid+=np.sum(valid_seg[i]==2)
+for i in keys_test:
+    label_0_test+=np.sum(test_seg[i]==0)
+    label_1_test+=np.sum(test_seg[i]==1)
+    label_2_test+=np.sum(test_seg[i]==2)
+
+
+print ("{:<8} | {:<15} {:<20}".format('Fold','Clase','Total voxeles por clase'))
+print ('----------------------------------------------------------------------------')
+print ("{:<8} | {:<15} {:<20}".format('Train',labels_train[0],label_0_train))
+print ("{:<8} | {:<15} {:<20}".format('Train',labels_train[1],label_1_train))
+print ("{:<8} | {:<15} {:<20}".format('Train',labels_train[2],label_2_train))
+
+print ("{:<8} | {:<15} {:<20}".format('Valid',labels_valid[0],label_0_valid))
+print ("{:<8} | {:<15} {:<20}".format('Valid',labels_valid[1],label_1_valid))
+print ("{:<8} | {:<15} {:<20}".format('Valid',labels_valid[2],label_2_valid))
+
+print ("{:<8} | {:<15} {:<20}".format('Test',labels_test[1],label_1_test))
+print ("{:<8} | {:<15} {:<20}".format('Test',labels_test[2],label_2_test))
+
+
+assert len(labels_train)==3, 'Estas contando de más o menos las etiquetas dentro del dataset'
+assert np.min(labels_train)==0, 'No estas contando la etiqueta 0'
+assert np.max(labels_train)==2, 'No estas contando la etiqueta 2'
+assert np.isclose(label_0_train+label_1_train,label_2_train,388497408,0.01), 'No esta mirando todo el dataset de entrenamiento'
+assert np.isclose(label_0_train,380543992,0.001), f'La cantidad de voxeles de la clase 0 en entrenamiento debería ser 380543992 y es {label_0_train}'
+
+
+import nibabel as nib
+from matplotlib import pyplot as plt
+import numpy as np
+import os
+from skimage.exposure import equalize_hist,match_histograms
+from skimage.filters import threshold_otsu as otsu
+import cv2
+from skimage.measure import label
+from skimage.morphology import ball,erosion,dilation
+
+vol_pre='' #volumen pre-procesado
+volume1='' #volumen de entrenamiento 1 (volume-1)
+segmen1='' #volumen de segmentación de entrenamiento 1 (segmentation-1)
+# YOUR CODE HERE
+volume1 = train_vols['1']
+segmen1 = train_seg['1']
+segmen1[segmen1 == 2] = 1
+vol_pre = volume1 - dilation(erosion(volume1, footprint=ball(3)), footprint=ball(3)) # original - apertura
+
+
+# Graficamos el resultado en sus 3 ejes
+fig, axs = plt.subplots(1,3, figsize=(10,7))
+#plt.subplots_adjust(hspace=0.6)
+#plt.suptitle('Resultados preliminares')
+corte_sagital, corte_coronal, corte_axial = vol_pre.shape[0]//2, vol_pre.shape[1]//2, 65
+
+# Volumen preliminar
+axs[0].imshow(vol_pre[corte_sagital,:,:])
+axs[0].axis('off')
+axs[0].set_title(f'Volumen preproc. preliminar \n Corte sagital {corte_sagital} \n')
+
+axs[1].imshow(vol_pre[:,corte_coronal,:])
+axs[1].axis('off')
+axs[1].set_title(f'Volumen preproc. preliminar \n Corte coronal {corte_coronal} \n')
+
+axs[2].imshow(vol_pre[:,:,corte_axial])
+axs[2].axis('off')
+axs[2].set_title(f'Volumen preproc. preliminar \n Corte axial {corte_axial} \n')
+
+plt.show()
+
+
+assert len(np.unique(vol_pre))>2, 'Deberia estar haciendo el pre-procesamiento en el volumen original, no en el predicho ni en el groundtruth'
+assert np.isclose(np.sum(vol_pre!=0),21346345,0.01), 'No calculó bien el pre-procesamiento'
+
+
+vol_pre_total='' #volumen pre-procesado completamente
+# YOUR CODE HERE
+mask_binary = np.logical_and(vol_pre>0.2, vol_pre<1) # mascara binaria donde se cumple el umbral
+mask = mask_binary * volume1 # mascara que tiene las intensidades originales
+
+vol_pre_total = volume1 - mask
+
+
+# Graficamos los resultados en sus 3 ejes
+fig, axs = plt.subplots(3,3, figsize=(9,12)) # ancho, alto
+plt.subplots_adjust(hspace=0.4)
+corte_sagital, corte_coronal, corte_axial = volume1.shape[0]//2, volume1.shape[1]//2, 65
+
+volumenes = [volume1, vol_pre_total, segmen1]
+nombres = ['Volumen original', 'Volumen prepoc. propuesto', 'Segmentación groundtruth']
+
+for i in range(3):
+    axs[i,0].imshow(volumenes[i][corte_sagital,:,:])
+    axs[i,0].axis('off')
+    axs[i,0].set_title(f'{nombres[i]} \n Corte sagital {corte_sagital} \n')
+    
+    axs[i,1].imshow(volumenes[i][:,corte_coronal,:])
+    axs[i,1].axis('off')
+    axs[i,1].set_title(f'{nombres[i]} \n Corte coronal {corte_coronal} \n')    
+    
+    axs[i,2].imshow(volumenes[i][:,:,corte_axial])
+    axs[i,2].axis('off')
+    axs[i,2].set_title(f'{nombres[i]} \n Corte axial {corte_axial} \n')
+
+plt.show()
+
+
+assert len(np.unique(vol_pre_total))!=2, 'No hizo el pre-procesamiento completo en el volumen original sino en otro volumen'
+assert np.min(vol_pre_total)>=0, 'Seguramente restó la mascara binaria directamente'
+assert np.isclose(np.sum(vol_pre_total>0.8),1490437,0.1), 'No realizó bien el pre-procesamiento para eliminar las estructuras en el volumen original'
+
+
+def Jaccard_3D(Im,Gt):
+    '''
+    :param Im: Volumen de prediccion.
+    :param Gt: Segmentacion groundtruth.
+    '''
+    # YOUR CODE HERE
+    inter = np.sum ( np.logical_and(Im, Gt) )
+    union = np.sum( np.logical_or(Im, Gt) )
+    J = inter / union
+    return J
+
+def errores(segment_pred,segmen1):
+    'segment_pred (ndarray): volumen de predicción'
+    'segmen1 (ndarray): volumen de groundtruth'
+    # YOUR CODE HERE
+    FP_volumes = np.logical_and(segment_pred, np.logical_not(segmen1))
+    FN_volumes = np.logical_and(segmen1, np.logical_not(segment_pred))
+    return FP_volumes,FN_volumes
+
+def Vol2D_max_component(Vol,umbral,operador):
+    # YOUR CODE HERE
+    segmentacion = np.zeros(Vol.shape)
+    for i in range(Vol.shape[2]):
+        segmentacion[:,:,i] = max_component(Vol[:,:,i], umbral, operador)
+    return segmentacion
+
+def max_component(Im,umbral,operador):
+    'Im (ndarray): Imagen a segmentar'
+    'umbral (float): Umbral a utilizar'
+    'operador (str): Puede ser "mayor" para > o "menor" para < segun se quiera umbralizar'
+    # YOUR CODE HERE
+    
+    # Umbralizamos
+    if operador == 'mayor':
+        Im = Im > umbral
+    elif operador == 'menor':
+        Im = Im < umbral
+    
+    # encontramos el label del mayor componente
+    labeled_img, n_labels = label(Im, return_num=True)
+    label_mayor, label_count = 0, 0
+    for label_i in range(1, n_labels+1):
+        label_i_count = np.sum(labeled_img==label_i)
+        if label_i_count > label_count:
+            label_mayor = label_i
+            label_count = label_i_count
+    
+    # encontramos el mayor componente
+    max_comp = (labeled_img == label_mayor) * Im
+    return max_comp
+
+
+aux_segment=Vol2D_max_component(volume1,0.8,'mayor')
+fp,fn=errores(aux_segment,segmen1)
+
+J_sinpre=Jaccard_3D(aux_segment,segmen1)
+segment_conpre=Vol2D_max_component(vol_pre_total,0.8,'mayor')
+J_conpre=Jaccard_3D(segment_conpre,segmen1)
+
+print(f'El jaccard sin preprocesamiento es: {J_sinpre}')
+print(f'El jaccard con preprocesamiento es: {J_conpre}')
+
+
+fp2,fn2=errores(segment_conpre,segmen1)
+print(f'Los falsos positivos del volumen no preprocesado es {np.sum(fp)}')
+print(f'Los falsos positivos del volumen preprocesado es {np.sum(fp2)}')
+
+print(f'Los falsos negativos del volumen no preprocesado es {np.sum(fn)}')
+print(f'Los falsos negativos del volumen preprocesado es {np.sum(fn2)}')
+
+
+# YOUR CODE HERE
+import time
+from skimage.morphology import opening, closing, octahedron, cube
+
+def pre_total(vol_pre):
+    mask_binary = np.logical_and(vol_pre>0.2, vol_pre<1) # mascara binaria donde se cumple el umbral
+    mask = mask_binary * volume1 # mascara que tiene las intensidades originales
+    vol_pre_total = volume1 - mask
+    return vol_pre_total
+
+def evaluar_preproc(vol_eval):
+    
+    segment_eval=Vol2D_max_component(vol_eval,0.8,'mayor')
+    J_eval=Jaccard_3D(segment_eval,segmen1)
+    print(f'El jaccard con preprocesamiento dado es: {round(J_conpre,3)}')
+    print(f'El jaccard con preprocesamiento del exp. evaluado es: {round(J_eval,3)}')
+    fp_eval,fn_eval=errores(segment_eval,segmen1)
+    print(f'Los falsos positivos del volumen preprocesado dado es {np.sum(fp2)}')
+    print(f'Los falsos positivos del volumen preprocesado experimento es {np.sum(fp_eval)}')
+    print(f'Los falsos negativos del volumen preprocesado dado es {np.sum(fn2)}')
+    print(f'Los falsos negativos del volumen preprocesado experimento es {np.sum(fn_eval)}')
+    
+
+# Experimento 1
+def experimento1():
+    print('Experimento 1: el elemento estructurante es una bola de tamaño 4')
+    ee_exp1 = ball(4)
+    vol_pre_exp1 = volume1 - opening(volume1, footprint=ee_exp1) # original - apertura
+    vol_pre_total_exp1 = pre_total(vol_pre_exp1)
+    evaluar_preproc(vol_pre_total_exp1)
+    
+# Experimento 2
+def experimento2(vol=volume1):
+    print('\nExperimento 2: el elemento estructurante es una matriz 3D de dimensiones (7, 40, 7)')
+    size_x, size_y, size_z = 7, 40, 7 # coronal el mayor
+    ee_exp2 = np.ones((size_x, size_y, size_z), dtype=bool)
+
+    vol_pre_exp2 = vol - opening(vol, footprint=ee_exp2) # original - apertura
+    vol_pre_total_exp2 = pre_total(vol_pre_exp2)
+    
+    evaluar_preproc(vol_pre_total_exp2)
+    
+    #plt.imshow(vol_pre_total_exp2[:,:,65])
+    return vol_pre_total_exp2
+
+# Experimento 3
+def experimento3():
+    print('\nExperimento 3: el elemento estructurante es un octaedro de tamaño 3')
+    ee_exp3 = octahedron(3)
+    vol_pre_exp3 = volume1 - opening(volume1, footprint=ee_exp3) # original - apertura
+    vol_pre_total_exp3 = pre_total(vol_pre_exp3)
+    evaluar_preproc(vol_pre_total_exp3)
+    
+# Experimento 4
+def experimento4():
+    print('\nExperimento 4: el elemento estructurante es un cubo de tamaño 3')
+    ee_exp4 = cube(3)
+    vol_pre_exp4 = volume1 - opening(volume1, footprint=ee_exp4) # original - apertura
+    vol_pre_total_exp4 = pre_total(vol_pre_exp4)
+    evaluar_preproc(vol_pre_total_exp4)
+
+#inicio = time.time()
+experimento1()
+mejor_exp = experimento2()
+experimento3()
+experimento4()
+print('El experimento que arrojó un mejor resultado fue el 4, con un Jaccard de 0.703')
+#fin = time.time()
+#print(f"El tiempo de ejecución fue: {fin - inicio} segundos")    
+
+
+# BONO
+
+# La imagen parece estar reflejada en el eje x (higado debería estar al lado derecho de la columna)
+corte_axial = 38 # riñones en corte 38
+fig,ax=plt.subplots(1,2)
+
+ax[0].imshow(volume1[:,:,corte_axial])
+ax[0].axis('off')
+ax[0].set_title(f'Riñones en vol. original \n Corte axial {corte_axial} \n')   
+
+ax[1].imshow(mejor_exp[:,:,corte_axial])
+ax[1].axis('off')
+ax[1].set_title(f'Riñones eliminados en Exp. 2 \n Corte axial {corte_axial} \n')    
+
+plt.show()
+
+
+def preprocesamiento_total(vol):
+    # YOUR CODE HERE
+    vol_pre_total = experimento2(vol)
+    return vol_pre_total
+
+
+vol_pre_total2=preprocesamiento_total(volume1)
+vol_segmentado=Vol2D_max_component(vol_pre_total2,0.8,'mayor')
+J_total=Jaccard_3D(vol_segmentado,segmen1)
+
+assert J_total>J_conpre, 'El jaccard de su preprocesamiento total debe ser mayor al preprocesamiento propuesto'
+
+
+vol_preprocesado='' #volumen final pre-procesado
+vol_segmentado='' #volumen segmentado con el pre-procesamiento
+FP_sinpost='' #volumen con pixeles unicamente Falsos Positivos
+FN_sinpost='' #volumen con pixeles unicamente Falsos Negativos
+
+def errores(segment_pred,segmen1):
+    'segment_pred (ndarray): volumen de predicción'
+    'segmen1 (ndarray): volumen de groundtruth'
+    # YOUR CODE HERE
+    FP_volumes = np.logical_and(segment_pred, np.logical_not(segmen1))
+    FN_volumes = np.logical_and(segmen1, np.logical_not(segment_pred))
+    return FP_volumes,FN_volumes
+
+# YOUR CODE HERE
+vol_preprocesado = vol_pre_total2
+vol_segmentado = Vol2D_max_component(vol_pre_total2,0.8,'mayor')
+FP_sinpost, FN_sinpost = errores(vol_segmentado, segmen1)
+
+s_sag, s_cor, s_ax = 0, 0, 0
+err_sag, err_cor, err_ax = 0, 0, 0
+
+# encontramos el slice con más errores del eje sagital
+for i in range(vol_preprocesado.shape[0]):
+    err_slice_i =  np.sum(FP_sinpost[i,:,:]) + np.sum(FN_sinpost[i,:,:])
+    if err_slice_i > err_sag:
+        err_sag = err_slice_i
+        s_sag = i
+
+# encontramos el slice más errores del eje coronal
+for j in range(vol_preprocesado.shape[1]):
+    err_slice_j =  np.sum(FP_sinpost[:,j,:]) + np.sum(FN_sinpost[:,j,:])
+    if err_slice_j > err_cor:
+        err_cor = err_slice_j
+        s_cor = j
+
+# encontramos el slice más errores del eje axial
+for k in range(vol_preprocesado.shape[2]):
+    err_slice_k =  np.sum(FP_sinpost[:,:,k]) + np.sum(FN_sinpost[:,:,k])
+    if err_slice_k > err_ax:
+        err_ax = err_slice_k
+        s_ax = k
+
+slices = [s_sag, s_cor, s_ax]        
+segs = [segmen1, vol_segmentado, FP_sinpost, FN_sinpost]
+seg_nombres = ['Segmentación GT', 'Segmentación preproc.', 'FP sin post', 'FN sin post']
+
+
+# Graficamos los cortes con mas errores del higado segmentado  
+fig, axs = plt.subplots(3,4, figsize=(10,10))
+plt.subplots_adjust(hspace=0.5, wspace=0.5)
+
+for j in range(4):
+    axs[0,j].imshow(segs[j][s_sag,:,:])
+    axs[0,j].axis('off')
+    axs[0,j].set_title(f'{seg_nombres[j]} \n Corte sagital {s_sag} \n')
+
+    axs[1,j].imshow(segs[j][:,s_cor,:])
+    axs[1,j].axis('off')
+    axs[1,j].set_title(f'{seg_nombres[j]} \n Corte coronal {s_cor} \n')
+    
+    axs[2,j].imshow(segs[j][:,:,s_ax])
+    axs[2,j].axis('off')
+    axs[2,j].set_title(f'{seg_nombres[j]} \n Corte axial {s_ax} \n')
+    
+plt.show()
+
+
+from skimage.morphology import binary_opening, binary_closing
+
+vol_post='' #volumen post-procesado
+# YOUR CODE HERE
+vol_post = binary_opening(vol_segmentado, footprint=ball(3)) # vol_segmentado y vol_post son binarios
+
+
+assert len(np.unique(vol_post))==2, 'No esta post-procesando en el volumen binario predicho'
+assert Jaccard_3D(vol_post,segmen1)>Jaccard_3D(vol_segmentado,segmen1), 'Su post-procesamiento no mejora su predicción'
+
+
+from skimage.morphology import binary_dilation, binary_erosion, octahedron, cube
+
+# YOUR CODE HERE
+
+# Exp1:
+print(f'Experimento 1: dilatación con octahedro de tamaño 1')
+vol_post1 = binary_dilation(vol_post, footprint=octahedron(1)) # aumenta un poco el Jaccard
+print(f'Jaccard = {Jaccard_3D(vol_post1,segmen1)}') 
+
+# Exp2:
+print(f'\nExperimento 2: erosión con cubo de tamaño 2')
+vol_post2 = binary_erosion(vol_post, footprint=cube(2)) # disminuye el Jaccard
+print(f'Jaccard = {Jaccard_3D(vol_post2,segmen1)}') 
+
+# Exp3:
+print(f'\nExperimento 3: dilatación con cubo de tamaño 2')
+vol_post3 = binary_dilation(vol_post, footprint=cube(2)) # aumenta aún más el Jaccard
+print(f'Jaccard = {Jaccard_3D(vol_post3,segmen1)}') 
+
+print(f'El mejor resultado fue dilatando con un cubo de tamaño 2 debido a que subsegmentamos (mayor precision)')
+
+
+def geodesic_dilatation(mask, E1,E2,max_iterations):
+    # YOUR CODE HERE
+    eroded = erosion(mask, footprint=E1)
+    result = eroded.copy()
+    
+    for it in range(1, max_iterations+1):
+        
+        dilated = dilation(result, footprint=E2)
+
+        new_result = np.logical_and(dilated, mask)
+        
+        if np.array_equal(result, new_result):
+            break
+            
+        result = new_result.copy()
+    
+    iterations = it
+    return result.astype(int),iterations
+
+
+vol_post_2='' #volumen de postprocesamiento total previo a la dilatación geodesica
+E1='' # elemento estructurante para la erosión
+E2='' # elemento estructurante para la dilatación
+max_iterations='' #iteraciones maximas
+# YOUR CODE HERE
+E1 = ball(8)
+E2 = ball(2)
+max_iterations = 100
+
+
+assert np.sum(E1)==2109, 'La erosión se está realizando con un elemento erroneo'
+assert np.sum(E2)==33, 'La dilatacíon se está realizando con un elemento erroneo'
+
+
+reconstruccion,iterations=geodesic_dilatation(vol_post,E1,E2,max_iterations) #esta función puede demorar en correr
+
+
+Jaccard_3D(reconstruccion,segmen1)
+
+
+assert iterations<max_iterations, 'Sus maximas iteraciones deben ser mayores a las iteraciones completas'
+assert np.sum(reconstruccion), 'Su volumen de reconstrucción está vacio'
+assert np.sum(reconstruccion)!=np.sum(vol_post), 'No realizó ningun procesamiento'
+assert np.isclose(np.sum(dilation(reconstruccion, E2)*vol_post-reconstruccion),0) or iterations==max_iterations, f'La dilatación de la reconstrucción intesección con la mascara no es igual a la reconstrucción, no se realizó bien la geodesic_dilatation'
+
+
+# YOUR CODE HERE
+
+def baseline(vol, ee1, ee2):
+    vol = binary_opening(vol, footprint=ee1)
+    vol = binary_dilation(vol, footprint=ee2)
+    return vol
+
+#Exp1: 
+def exp1(vol=vol_post):
+    print('Exp. 1: el primer EE es una bola de tamaño 3 y el segundo EE es un cubo de tamaño 2')
+    ee1 = ball(3)
+    ee2 = cube(2)
+    vol1 = baseline(vol,ee1,ee2)
+    print(f'Jaccard = {round(Jaccard_3D(vol1,segmen1),2)}') 
+    return vol1
+
+#Exp2: 
+def exp2(vol=vol_post):
+    print('\nExp. 2: el primer EE es una octahedro de tamaño 2 y el segundo EE es un cubo de tamaño 2')
+    ee1 = octahedron(2)
+    ee2 = cube(2)
+    vol2 = baseline(vol,ee1,ee2)
+    print(f'Jaccard = {round(Jaccard_3D(vol2,segmen1),2)}') 
+    return vol2
+
+#Exp3: 
+def exp3(vol=vol_post):
+    print('\nExp. 3: el primer EE es una bola de tamaño 3 y el segundo EE es una matriz 3D de dimensiones (3, 20, 3)')
+    ee1 = ball(3)
+    size_x, size_y, size_z = 3, 20, 3 # coronal el mayor
+    ee2 = np.ones((size_x, size_y, size_z), dtype=bool)
+    vol3 = baseline(vol,ee1,ee2)
+    print(f'Jaccard = {round(Jaccard_3D(vol3,segmen1),2)}') 
+    return vol3
+
+#Exp4: 
+def exp4(vol=vol_post):
+    print('\nExp. 4: el primer EE es una bola de tamaño 3 y el segundo EE es un cubo de tamaño 3')
+    ee1 = ball(3)
+    ee2 = cube(3)
+    vol4 = baseline(vol,ee1,ee2)
+    print(f'Jaccard = {round(Jaccard_3D(vol4,segmen1),2)}') 
+    return vol4
+    
+exp1()
+exp2()
+exp3()
+exp4()
+print("\nEl mejor experimento fue el 1 con un Jaccard de 0.747. Solo a este realizaremos "
+      "la dilatación geodésica en el paso siguiente para finalizar el postprocesamiento.")
+
+
+def postprocesamiento_total(vol):
+    # YOUR CODE HERE
+    vol_post_total = exp1(vol)
+    print('Por último, realizamos la dilatación geodésica:')
+    vol_post_total, _ = geodesic_dilatation(vol_post_total,ball(8),ball(2),100) #esta función puede demorar en correr
+    print(f'El Jaccard resultante es de {Jaccard_3D(vol_post_total,segmen1)}.')
+    return vol_post_total
+
+
+vol_post_total=postprocesamiento_total(vol_segmentado)
+
+
+J_post=Jaccard_3D(vol_post_total,segmen1)
+J_post_propuesto=Jaccard_3D(vol_post,segmen1)
+
+assert J_post>J_post_propuesto, 'El Jaccard del preprocesamiento propuesot por usted debe ser mayor al propuesto por nosotros'
+
+
+from utils import *
+converter('Entrega 2')
+
+
