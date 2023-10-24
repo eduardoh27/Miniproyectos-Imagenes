@@ -1,0 +1,788 @@
+from skimage.morphology import dilation, erosion, ball
+from glob import glob
+import os
+import nibabel as nib
+import matplotlib.pyplot as plt
+
+borders = '' #Variable que tendrá los bordes del volumen 1 de entrenamiento 
+element = '' #Variable que tendrá un elemento estructurante de esfera de radio 5
+
+def morph_gradient(gray_img,EE):
+    # YOUR CODE HERE
+    return dilation(gray_img, footprint=EE) - erosion(gray_img, footprint=EE)
+
+# YOUR CODE HERE
+ruta_vol1_train = glob(os.path.join('DB','train','volume-1.nii.gz'))[0]
+volume1 = nib.load(ruta_vol1_train).get_fdata()
+element = ball(5)
+borders = morph_gradient(volume1, element)
+
+
+import numpy as np
+assert borders.shape == (512,512,123), f'Alteró el tamaño de su volumen, debe ser (512,512,123) no {borders.shape}'
+assert len(element.shape)==3,f'su elemento estructurante debería tener 3 dimensiones, no {len(element.shape)}'
+assert element.shape==(11,11,11),f'su elemento estructurante está definido erroneamente su tamaño debe ser (512,512,2), no {element.shape}'
+assert len(np.unique(element))==2, f'su elemento estructurante solo debería tener 2 valores, no {len(np.unique(element))}'
+assert np.min(borders)>=0 and np.max(borders)<=1 ,f'el rango de su borde debería estar entre 0 y 1, no entre {np.min(borders)} y {np.max(borders)}'
+
+
+from skimage.segmentation import watershed
+
+watersheds_org = '' #variable que tendrá el resultado de hacer watersheds sin marcadores
+# YOUR CODE HERE
+watersheds_org = watershed(borders)
+
+
+assert watersheds_org.shape == (512,512,123), f'Alteró el tamaño de su volumen de watersheds, debe ser (512,512,123) no {watersheds_org.shape}'
+assert watersheds_org.dtype=='int32' ,f'su volumen debería ser de tipo int 32 no {watersheds_org.dtype}'
+
+
+# Graficamos los resultados en 2 cortes axiales
+fig, axs = plt.subplots(2,3, figsize=(9,7)) # ancho, alto
+corte_axial1, corte_axial2 = 65, volume1.shape[2]//2
+
+volumenes = [volume1, borders, watersheds_org]
+nombres = ['Volumen original', 'Gradiente morfológico', 'Segmentación Watershed']
+
+for j in range(3):
+    axs[0,j].imshow(volumenes[j][:,:,corte_axial1])
+    axs[0,j].axis('off')
+    axs[0,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial1} \n')
+    
+    axs[1,j].imshow(volumenes[j][:,:,corte_axial2])
+    axs[1,j].axis('off')
+    axs[1,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial2} \n')    
+
+plt.show()
+
+
+print(f'La cantidad de segmentos es de {len(np.unique(watersheds_org))}. Se observa una gran sobresegmentación.')
+
+
+from skimage.morphology import h_minima
+
+minima = ''#Variable que contendrá los h-minimos
+# YOUR CODE HERE
+minima = h_minima(borders, 0.05) # el h es menor a 1 porque estamos trabajando volumenes con valores entre 0 y 1
+
+
+assert minima.shape == (512,512,123), f'Alteró el tamaño de su volumen de minimos, debe ser (512,512,123) no {minima.shape}'
+assert minima.dtype=='uint8' ,f'su volumen debería ser de tipo uint8 no {minima.dtype}'
+assert len(np.unique(minima))==2,f'sus minimos solo deberían tener 2 valores, no {len(np.unique(minima))}'
+
+
+from skimage.morphology import label
+
+markers = ''# Variable que tendrá los marcadores con sus respectivos labels
+watersheds_h = '' #variable que tendrá el resultado de hacer watersheds
+# YOUR CODE HERE
+markers = label(minima)
+watersheds_h = watershed(borders, markers=markers)
+
+
+assert markers.shape == (512,512,123), f'Alteró el tamaño de su volumen de minimos, debe ser (512,512,123) no {markers.shape}'
+assert markers.dtype=='int64' ,f'su volumen de marcadores debería ser de tipo int64 no {markers.dtype}'
+assert watersheds_h.shape == (512,512,123), f'Alteró el tamaño de su volumen de watersheds, debe ser (512,512,123) no {watersheds_h.shape}'
+assert watersheds_h.dtype=='int32' ,f'su volumen de watersheds debería ser de tipo int32 no {watersheds_h.dtype}'
+assert len(np.unique(markers))-1==len(np.unique(watersheds_h)),f'sus minimos y su resultado de watersheds no tienen los mismos valores {len(np.unique(markers))} y{len(np.unique(watersheds_h))}'
+
+
+# Graficamos los resultados en 2 cortes axiales
+fig, axs = plt.subplots(2,4, figsize=(12,8)) # ancho, alto
+corte_axial1, corte_axial2 = 65, 69
+
+volumenes = [volume1, borders, minima, watersheds_h]
+nombres = ['Volumen original', 'Gradiente morfológico', 'h-minimos', 'Segmentación Watershed']
+
+for j in range(4):
+    axs[0,j].imshow(volumenes[j][:,:,corte_axial1])
+    axs[0,j].axis('off')
+    axs[0,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial1} \n')
+    
+    axs[1,j].imshow(volumenes[j][:,:,corte_axial2])
+    axs[1,j].axis('off')
+    axs[1,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial2} \n')    
+
+plt.show()
+
+
+print(f'La cantidad de segmentos es {len(np.unique(watersheds_h))}. Se disminuyó considerablemente la sobresegmentación.')
+
+
+import numpy as np
+from skimage.measure import label
+
+def NN(train_data, predict):
+    # YOUR CODE HERE
+    
+    predict_vector = [] # Inicializamos el vector a retornar
+    train_vectors, train_etiquetas = train_data
+    
+    for pred_vector in predict:
+        # Inicio variables de búsqueda
+        distancia_minima = np.inf
+        etiqueta_minima = None
+        for j, train_vector in enumerate(train_vectors):
+            # Para cada valor a predecir, se toma cada dato de entrenamiento
+            suma = 0
+            for i in range(len(train_vector)):
+                suma += (train_vector[i]-pred_vector[i])**2
+            # Se calcula la distancia entre el vector a predecir y el dato de train
+            distancia = np.sqrt(suma) 
+            # En caso de ser la menor, se actualiza la etiqueta a retornar
+            if distancia < distancia_minima:
+                distancia_minima = distancia
+                etiqueta_minima = train_etiquetas[j]
+        # Por último, se añade el mínimo encontrado
+        predict_vector.append(etiqueta_minima)
+                
+    return predict_vector
+
+def NN1(train_data, predict): # optimización
+    """
+    Nearest Neighbor function for prediction.
+    
+    train_data (tuple): Tuple containing feature vectors and corresponding labels.
+    predict (list): List of feature vectors to predict.
+    
+    Returns:
+    list: List of predicted labels.
+    """
+    
+    train_vectors, train_labels = np.array(train_data[0]), np.array(train_data[1])
+    predict = np.array(predict)
+    predict_vector = []
+    
+    for p in predict:
+        # Calculate distances between the vector to predict and all training vectors
+        distances = np.linalg.norm(train_vectors - p, axis=1)
+        
+        # Find the index of the smallest distance
+        closest_index = np.argmin(distances)
+        
+        # Append the label of the closest training vector to the predicted labels list
+        predict_vector.append(train_labels[closest_index])
+        
+    return predict_vector
+
+
+train_data=([[0,0],[0,1],[1,0],[1,1]],[0,0,1,1])
+predict=[[0,0.5],[1,0.5],[0.7,0],[0.3,0]]
+predict_vector=NN(train_data,predict)
+
+
+predict_vector
+
+
+assert len(predict_vector)==len(predict)
+assert not np.sum(predict_vector-np.array([0,1,1,0])), 'Sus predicciones fueron erroneas'
+
+
+from glob import glob
+from tqdm import tqdm
+
+seed=np.random.seed(0)
+
+def voxels_train(fold,bins):
+    
+    paths_v=glob(os.path.join('DB',fold,'volume*'))
+    paths_s=glob(os.path.join('DB',fold,'segmentation*'))
+    v=[]
+    l=[]
+    for i,pv in tqdm(enumerate(paths_v)):
+        vol=nib.load(pv).get_fdata()
+        seg=nib.load(paths_s[i]).get_fdata()>0
+        x,y,z=vol.shape
+        while np.sum(l)<100*(i+1):
+            r1=np.random.randint(3,x-3)
+            r2=np.random.randint(3,y-3)
+            r3=np.random.randint(3,z-3)
+            etiqueta=seg[r1,r2,r3]
+            if etiqueta:
+                etiqueta=1
+            else:
+                etiqueta=0
+            if len(l)<1000*(i+1) or etiqueta==1:
+                h,_=np.histogram(vol[r1-1:r1+2,r2-1:r2+2,r3-1:r3+2],bins=bins)
+                v.append(h)
+                l.append(etiqueta)
+    
+    return (v,l)
+            
+
+
+train_data_total=voxels_train('train',27)
+
+
+etiquetas,cuenta=np.unique(train_data_total[1],return_counts=True)
+assert np.isclose(np.sum(np.array(train_data_total[1])==1),300,0.1), f'Debería tener 300 datos positivos en su muestra y tiene {np.sum(train_data_total[1]==1)}'
+assert len(etiquetas)==2, 'Solo deberíamos tener 2 etiquetas en la muestra'
+assert np.max(etiquetas)==1 and np.min(etiquetas)==0, 'La maxima etiqueta debe ser 1 y la minima 0'
+assert len(train_data_total[0])>3000, f'Su muestra debe tener al menos 3000 datos y tiene {len(train_data_total[0])}'
+assert len(train_data_total[0][0])==27, 'Si se hizo un histograma de 27 bins, la dimensión del vector de caracteristicas debe ser 27'
+
+
+from tqdm import tqdm
+
+def Vol2D_max_component(Vol,umbral,operador):
+    # YOUR CODE HERE
+    segmentacion = np.zeros(Vol.shape)
+    for i in range(Vol.shape[2]):
+        segmentacion[:,:,i] = max_component(Vol[:,:,i], umbral, operador)
+    return segmentacion
+
+def max_component(Im,umbral,operador):
+    'Im (ndarray): Imagen a segmentar'
+    'umbral (float): Umbral a utilizar'
+    'operador (str): Puede ser "mayor" para > o "menor" para < segun se quiera umbralizar'
+    # YOUR CODE HERE
+    
+    # Umbralizamos
+    if operador == 'mayor':
+        Im = Im > umbral
+    elif operador == 'menor':
+        Im = Im < umbral
+    
+    # encontramos el label del mayor componente
+    labeled_img, n_labels = label(Im, return_num=True)
+    label_mayor, label_count = 0, 0
+    for label_i in range(1, n_labels+1):
+        label_i_count = np.sum(labeled_img==label_i)
+        if label_i_count > label_count:
+            label_mayor = label_i
+            label_count = label_i_count
+    
+    # encontramos el mayor componente
+    max_comp = (labeled_img == label_mayor) * Im
+    return max_comp
+
+
+#Creando el volumen a priori
+vol1='' #Volumen volume-1.nii
+segmentacion_priori=''#volumen de segmentación a priori
+seg1='' #Volumen segmentation-1.nii
+
+# YOUR CODE HERE
+vol1 = volume1
+seg1 = nib.load(glob(os.path.join('DB','train','segmentation-1.nii.gz'))[0]).get_fdata()
+seg1 = seg1>0
+segmentacion_priori = Vol2D_max_component(vol1, 0.8, 'mayor')
+
+
+negative=0 #Numero de negativos obtenidos
+positive=0 #Numero de positivos obtenidos
+minima2='' #Volumen de semillas clasificadas
+# YOUR CODE HERE
+minima2=np.zeros(vol1.shape)
+minima_test = h_minima(borders, 0.01) # se usa un h menor
+
+# Recorrer h_minima en slice 65 buscando voxeles de intensidad 1
+for i in range(minima_test[:,:,65].shape[0]):
+    for j in range(minima_test[:,:,65].shape[1]):
+        if (minima_test[i,j,65] == 1):
+        
+            if segmentacion_priori[i,j,65] == 1:
+                #print('dentro')
+                h,_=np.histogram(vol1[i-1:i+2,j-1:j+2,65-1:65+2],bins=27)
+                etiqueta = NN(train_data_total, [h])[0]
+                if etiqueta == 1:
+                    #print(f'pos: {i,j}')
+                    positive += 1
+                    minima2[i,j,65] = 2
+            else:
+                #print('fuera')
+                if vol1[i,j,65]>0.1 and vol1[i,j,65]<0.7:
+                    h,_=np.histogram(vol1[i-1:i+2,j-1:j+2,65-1:65+2],bins=27)
+                    etiqueta = NN(train_data_total, [h])[0]
+                    if etiqueta == 0:
+                        #print(f'neg: {i,j}')
+                        negative += 1
+                        minima2[i,j,65] = 1
+
+
+# YOUR CODE HERE
+from skimage.morphology import closing, disk
+
+# Graficamos los resultados en el corte axial 65
+#plt.imshow(minima2[:,:,65])
+#plt.show()
+#plt.imshow(dilation(minima2[:,:,65],footprint=disk(3))+borders[:,:,65])
+plt.imshow(dilation(minima2[:,:,65],footprint=disk(2)) + segmentacion_priori[:,:,65])
+plt.axis('off')
+plt.show()
+
+
+etiquetas, cantidades= np.unique(minima2,return_counts=True)
+assert negative and positive, 'Deben haber más de un positivo y un negativo en sus semillas, de no ser así, intente obtener más minimos con h-minimos bajando el h'
+assert len(minima2.shape)==3, 'Las dimensiones del volumen de minima2 deberían ser 3'
+assert np.sum(minima2[:,:,65]), 'Las semillas deben estar en el slice 65 axial'
+assert len(etiquetas)==3, f'Deberían haber 3 etiquetas diferentes en el volumen de etiquetas clasificadas y son {len(etiquetas)}'
+assert np.max(etiquetas)==2, f'El valor de la etiqueta maxima debe ser 2 y es {np.max(etiquetas)}'
+assert np.min(etiquetas)==0, f'El valor de la etiqueta minima debe ser 0 y es {np.min(etiquetas)}'
+assert cantidades[0]>=1 and cantidades[1]>=1 and cantidades[2]>=1, 'Debería haber al menos una etiqueta de cada una en su volumen'
+
+indicesx,indicesy,indicesz=np.where(minima2==2)
+h,_=np.histogram(vol1[indicesx[0]-1:indicesx[0]+2,indicesy[0]-1:indicesy[0]+2,indicesz[0]-1:indicesz[0]+2],bins=27)
+result=NN(train_data_total,[h])
+assert result[0]==1, f'Usted asignó con la etiqueta 2 a una predicción de negativa, las predicciones negativas deben ser 1 y las positivas 2'
+
+indicesx,indicesy,indicesz=np.where(minima2==1)
+h,_=np.histogram(vol1[indicesx[0]-1:indicesx[0]+2,indicesy[0]-1:indicesy[0]+2,indicesz[0]-1:indicesz[0]+2],bins=27)
+result=NN(train_data_total,[h])
+assert result[0]==0, f'Usted asignó con la etiqueta 2 a una predicción de negativa, las predicciones negativas deben ser 1 y las positivas 2'
+
+
+borders_binary='' #Volumen del gradiente morfológico binario
+borders='' #Volumen del gradiente morfológico en escala de grises
+# YOUR CODE HERE
+borders_binary = morph_gradient(segmentacion_priori, element) # seg1 o segmentacion_priori?
+borders = morph_gradient(vol1, element)
+
+
+plt.imshow(borders_binary[:,:,66])
+plt.axis('off')
+plt.show()
+plt.imshow(borders[:,:,66])
+plt.axis('off')
+plt.show()
+
+
+new_segment_vol_binary='' #Volumen segmentado con watersheds usando gradiente binario
+new_segment_vol_gray='' #Volumen segmentado con watersheds usando gradiente grises
+# YOUR CODE HERE
+new_segment_vol_binary = watershed(borders_binary, markers=minima2)-1
+new_segment_vol_gray = watershed(borders, markers=minima2)-1
+
+
+def Jaccard_3D(Im,Gt):
+    '''
+    :param Im: Volumen de prediccion.
+    :param Gt: Segmentacion groundtruth.
+    '''
+    # YOUR CODE HERE
+    inter = np.sum ( np.logical_and(Im, Gt) )
+    union = np.sum( np.logical_or(Im, Gt) )
+    J = inter / union
+    return J
+
+# YOUR CODE HERE
+plt.imshow(new_segment_vol_binary[:,:,66], cmap='gray')
+plt.axis('off')
+print(f'El Jaccard del volumen de gradiente morfológico binario es de {Jaccard_3D(new_segment_vol_binary, seg1)}')
+plt.show()
+plt.imshow(new_segment_vol_gray[:,:,66], cmap='gray')
+plt.axis('off')
+print(f'El Jaccard del volumen de gradiente morfológico en escala de grises es de {Jaccard_3D(new_segment_vol_gray, seg1)}')
+plt.show()
+
+
+assert len(np.unique(new_segment_vol_binary))==2, 'Solo debeían haber 2 etiquetas en su volumen de segmentación'
+assert len(np.unique(new_segment_vol_gray))==2, 'Solo debeían haber 2 etiquetas en su volumen de segmentación'
+assert np.max(new_segment_vol_binary)==1, 'El maximo de su volumen de segmentación debería ser 1'
+assert np.max(new_segment_vol_gray)==1, 'El maximo de su volumen de segmentación debería ser 1'
+assert np.min(new_segment_vol_binary)==0, 'El minimo de su volumen de segmentación debería ser 0'
+assert np.min(new_segment_vol_gray)==0, 'El minimo de su volumen de segmentación debería ser 0'
+assert Jaccard_3D(new_segment_vol_binary,seg1>0)>0.5, 'Su volumen seguramente fue mal segmentado, puede deberse a la clasificación de sus semillas'
+assert Jaccard_3D(new_segment_vol_gray,seg1>0)>0.2, 'Su volumen seguramente fue mal segmentado, puede deberse a la clasificación de sus semillas, intente usar un hminima de 0.01'
+
+
+watersheds_imposed_seg='' #volumen segmentado condicionando segmentos
+watersheds_h='' #volumen sobresegmentado con watersheds y h minimos usando borders como mascara
+# YOUR CODE HERE
+watersheds_h = watershed(borders, markers=label(h_minima(borders, 0.05)))
+watersheds_imposed_seg = np.zeros(watersheds_h.shape)
+for label in np.unique(watersheds_h):
+    segmento = (watersheds_h == label).astype(int)
+    voxeles_segmento = np.sum(segmento)
+    interseccion = segmentacion_priori*segmento 
+    voxeles_segmento_in = np.sum(interseccion)
+    if voxeles_segmento_in > voxeles_segmento/2:
+        watersheds_imposed_seg[interseccion==1] = 1
+
+        plt.imshow(watersheds_imposed_seg[:,:,65], cmap='gray')
+plt.axis('off')
+plt.show()
+
+
+assert watersheds_imposed_seg.shape == (512,512,123), f'Alteró el tamaño de su volumen de segmentacion, debe ser (512,512,123) no {watersheds_imposed_seg.shape}'
+assert len(np.unique(watersheds_imposed_seg))==2,f'su volumen debería tener solo 1s y 0s de etiquetas, no deberia tener {np.unique(watersheds_imposed_seg)}'                                                   
+assert len(np.unique(watersheds_imposed_seg))!=1,f'su volumen tiene una unica etiqueta, revise los h que está usando'
+
+labels=np.unique(watersheds_h)
+etiqueta=(np.max(labels)-np.min(labels))//2
+
+valor=np.sum(segmentacion_priori*(watersheds_h==etiqueta))/np.sum(watersheds_h==etiqueta)
+
+assert (valor>=0.5 and np.sum((watersheds_h==etiqueta)*watersheds_imposed_seg)) or (valor<0.5 and not np.sum((watersheds_h==etiqueta)*watersheds_imposed_seg)), 'El segmento tiene mas voxeles positivos en el volumen a priori y se asignó la etiqueta equivocada o viseversa'
+
+
+print(f'El Jaccard es de {Jaccard_3D(watersheds_imposed_seg, seg1)}')
+
+
+def dato_unico(Vol, Vol_seg, Seg, bins, etiqueta):
+    """
+    Vol (ndarray): Volumen original
+    Vol_seg (ndarray): Volumen sobresegmentado
+    Seg (ndarray): Volumen groundtruth binario
+    bins (int): Numero de bins para el histograma
+    etiqueta (int): Numero de la etiqueta del segmento a evaluar
+    """
+    
+    # se obtiene el segmento del volumen segmentado que corresponde a la etiqueta de interés
+    mask = Vol_seg == etiqueta
+    interseccion = np.sum(Seg * mask)
+    
+    if interseccion:
+        if np.sum(mask) / interseccion > 0.5:
+            label = 1
+        else:
+            label = 0
+    else:
+        label = 0
+
+    # se obtiene el recorte del volumen original correspondiente al segmento
+    recorte = Vol * mask
+    
+    # se calcula el histograma normalizado
+    hist, _ = np.histogram(recorte, bins=bins, range=(0.001,np.max(recorte)))
+    hist = hist / np.sum(hist)
+        
+    return hist, label
+
+
+segmentos_p=np.unique(watersheds_h[:,:,65]*seg1[:,:,65])
+h,l=dato_unico(vol1,watersheds_h,seg1,40,segmentos_p[1])
+h2,l2=dato_unico(vol1,watersheds_h,seg1,40,40)
+
+assert l==1, 'Este segmento debería tener etiqueta de 1'
+assert l2==0, 'Este segmento debería tener etiqueta de 0'
+assert np.sum(h2)==1 and np.sum(h)==1, 'Los histogramas no estan normalizados'
+assert len(h2)==40, 'La longitud del histograma debe ser igual a la cantidad de bins especificada'
+assert h[0]<0.5, 'No incluya el fondo en su histograma'
+
+
+from skimage.measure import label
+from skimage.segmentation import watershed
+def Volume_dataset(Vol,Seg,hminimos,bins):
+    'Vol (ndarray): Volumen original'
+    'Seg (ndarray): Volumen groundtruth binario'
+    'hminimos (float): Valor para imponer h minimos'
+    'bins (int): Numero de bins para el histograma'
+    # YOUR CODE HERE
+    borders = morph_gradient(Vol, ball(2))
+    watersheds_h = watershed(borders, markers=label(h_minima(borders, hminimos)))
+    etiquetas=np.unique(watersheds_h) # solo de 65 de nuevo o todos
+    histogram_list, label_list = [], []
+    # por cada etiqueta, se encuentra el histograma y el label, y se agregan a las listas
+    for etiqueta in etiquetas[1:]:
+        h,l = dato_unico(Vol,watersheds_h,Seg,bins,etiqueta)
+        histogram_list.append(h)
+        label_list.append(l)    
+        
+    return histogram_list,label_list
+
+
+#ADVERTENCIA
+#Este codigo tarda mucho en correr, mas o menos 40 minutos
+h_lists,l_lists=Volume_dataset(vol1,seg1,0.1,40)
+
+
+assert len(h_lists)>0, 'Su lista está vacía'
+assert len(h_lists)==len(l_lists), 'Debe tener igual cantidad de datos que de etiquetas'
+assert len(h_lists[0])==40, 'La longitud de el vector de caracteristicas debe ser 40'
+assert np.max(l_lists)==1, 'La etiqueta maxima debe ser 1'
+assert np.min(l_lists)==0, 'La etiqueta minima debe ser 0'
+
+
+
+
+
+def Predict(Vol,Seg,hminimos,bins,h_lists,l_lists): 
+    'Vol (ndarray): Volumen original'
+    'hminimos (float): Valor para imponer h minimos'
+    'bins (int): Numero de bins para el histograma'
+    'h_list (list): Lista de histogramas'
+    'l_lists (list): Lista de etiquetas'
+    # YOUR CODE HERE
+    borders = morph_gradient(Vol, ball(2))
+    vol_seg = watershed(borders, markers=label(h_minima(borders, hminimos)))    
+    vol_seg = Seg*vol_seg
+    final_segment = np.zeros(Vol.shape)
+    
+    for etiqueta in np.unique(vol_seg)[1:]:
+        segmento = vol_seg == etiqueta
+        recorte = segmento * Vol
+        h, _ = np.histogram(recorte, range=(0.001,np.max(recorte)), bins=bins) 
+        h = h / np.sum(h)
+        prediction = NN((h_lists,l_lists), [h])[0]
+        if prediction == 1:
+            final_segment[vol_seg == etiqueta] = 1
+    return final_segment
+
+
+seg_priori='' #volumen de segmentación a priori
+# YOUR CODE HERE
+seg_priori = vol1>0.75
+
+
+#ADVERTENCIA
+#Este codigo puede demorarse en correr unos 20 minutos
+final_segment=Predict(vol1,seg_priori,0.1,40,h_lists,l_lists)
+
+
+assert np.max(final_segment)==1, 'La etiqueta maxima de la segmentación final debe ser 1'
+assert np.min(final_segment)==0, 'La etiqueta minima de la segmentación final debe ser 0'
+assert len(np.unique(final_segment))==2, 'Solo deben haber 2 etiquetas en su volumen'
+x,y,z=final_segment.shape
+x2,y2,z2=vol1.shape
+assert x==x2 and y==y2 and z==z2, 'Las dimensiones de su segmentación no coinsiden con las de su volumen original'
+assert Jaccard_3D(final_segment,seg1)>0.45, 'La segmentación final es muy mala, pruebe bajando los hminimos o cambiando la segmentación a priori'
+
+
+# YOUR CODE HERE
+print(f'El Jaccard es de {Jaccard_3D(final_segment, seg1)}')
+
+# Graficamos los resultados en 2 cortes axiales
+fig, axs = plt.subplots(2,2, figsize=(8,9)) # ancho, alto
+corte_axial1, corte_axial2 = 65, 69
+
+volumenes = [final_segment, seg1]
+nombres = ['Final segment', 'Segmentación GT']
+
+for j in range(2):
+    axs[0,j].imshow(volumenes[j][:,:,corte_axial1], cmap='gray')
+    axs[0,j].axis('off')
+    axs[0,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial1} \n')
+    
+    axs[1,j].imshow(volumenes[j][:,:,corte_axial2], cmap='gray')
+    axs[1,j].axis('off')
+    axs[1,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial2} \n')    
+
+plt.show()
+
+
+from skimage.morphology import opening, cube, binary_opening, binary_dilation, binary_closing
+from skimage.filters import median
+
+def Segmentacion(Vol):
+    # YOUR CODE HERE
+    
+    seg_total = Seg4(Vol) # se elige la mejor metodología
+    return seg_total
+
+# Metodología de la entrega pasada. Jaccard nulo debido al ruido de los volumenes.
+def Seg1(Vol):
+    vol_pre_total2=preprocesamiento_total(Vol) # preproc
+    vol_segmentado = Vol2D_max_component(vol_pre_total2,0.8,'mayor') # proc
+    vol_post_total=postprocesamiento_total(vol_segmentado) # postproc
+    return vol_post_total
+
+# Metodología de la entrega pasada con filtro mediano. Se obtiene un Jaccard de 0.69
+def Seg2(Vol):
+    Vol = median(Vol, ball(2))
+    vol_pre_total2=preprocesamiento_total(Vol) # preproc
+    #plt.imshow(vol_pre_total2[:,:,446])
+    #plt.axis('off')
+    #plt.show()
+    vol_segmentado = Vol2D_max_component(vol_pre_total2,0.8,'mayor') # proc
+    vol_post_total=postprocesamiento_total(vol_segmentado) # postproc
+    return vol_post_total
+
+
+# Segmentación de watersheds por medio de marcadores impuestos con clasificación de semillas para volumen binario.
+# Se utiliza filtro mediano, pero no preprocesamiento ni postprocesamiento. Se obtiene un Jaccard de 0.91
+def Seg3(Vol):
+    Vol = median(Vol, ball(2))
+    segmentacion_priori_val = Vol2D_max_component(Vol, 0.8, 'mayor')
+    element_val = ball(3)
+    borders_val = morph_gradient(Vol, element_val)
+    borders_binary_val = morph_gradient(segmentacion_priori_val, element_val) # seg1 o segmentacion_priori?
+    minima2_val = Minima2(vol_val_median, train_data_total, borders_val, segmentacion_priori_val)
+    new_segment_vol_binary_val = watershed(borders_binary_val, markers=minima2_val)-1
+    return new_segment_vol_binary_val
+    
+# Segmentación de watersheds por medio de marcadores impuestos con clasificación de semillas para volumen binario.
+# Se utiliza filtro mediano, preprocesamiento y postprocesamiento. Se obtiene un Jaccard de 0.93 y se comprueba
+# que el preproc. y el postproc. mejoran el resultado.
+def Seg4(Vol):
+    Vol = median(Vol, ball(2))
+    vol_pre_total2=preprocesamiento_total(Vol) # preproc
+    segmentacion_priori_val = Vol2D_max_component(vol_pre_total2, 0.8, 'mayor')
+    element_val = ball(3)
+    borders_val = morph_gradient(Vol, element_val)
+    borders_binary_val = morph_gradient(segmentacion_priori_val, element_val) # seg1 o segmentacion_priori?
+    minima2_val = Minima2(Vol, train_data_total, borders_val, segmentacion_priori_val)
+    new_segment_vol_binary_val = watershed(borders_binary_val, markers=minima2_val)-1
+    vol_post_total=postprocesamiento_total(new_segment_vol_binary_val) # postproc
+    return vol_post_total
+
+# Segmentación de watersheds por medio de marcadores impuestos con clasificación de semillas para volumen en escala de grises.
+# Se utiliza filtro mediano, preprocesamiento y postprocesamiento. Se obtiene un Jaccard de 0.49 
+def Seg5(Vol):
+    Vol = median(Vol, ball(2))
+    vol_pre_total2=preprocesamiento_total(Vol) # preproc
+    segmentacion_priori_val = Vol2D_max_component(vol_pre_total2, 0.8, 'mayor')
+    element_val = ball(3)
+    borders_val = morph_gradient(Vol, element_val)
+    minima2_val = Minima2(Vol, train_data_total, borders_val, segmentacion_priori_val)
+    new_segment_vol_gray_val = watershed(borders_val, markers=minima2_val)-1
+    vol_post_total=postprocesamiento_total(new_segment_vol_gray_val) # postproc
+    return vol_post_total
+
+# Prediction. Las predicciones que no funcionaban para train no funcionaron para valid. El Jaccard es nulo. 
+def Seg6(Vol):
+    Vol = median(Vol, ball(2))
+    vol_pre_total2=preprocesamiento_total(Vol) # preproc
+    seg_priori_val = Vol > 0.75
+    final_segment=Predict(Vol,seg_priori_val,0.1,40,h_lists,l_lists)
+    vol_post_total=postprocesamiento_total(final_segment) # postproc
+    return vol_post_total
+
+
+def Minima2(vol1, train_data_total, borders, segmentacion_priori):
+    negative=0 #Numero de negativos obtenidos
+    positive=0 #Numero de positivos obtenidos
+    minima2='' #Volumen de semillas clasificadas
+    # YOUR CODE HERE
+    minima2=np.zeros(vol1.shape)
+    minima_test = h_minima(borders, 0.01) # se usa un h menor
+
+    # Recorrer h_minima en slice 65 buscando voxeles de intensidad 1
+    for i in range(minima_test[:,:,446].shape[0]):
+        for j in range(minima_test[:,:,446].shape[1]):
+            if (minima_test[i,j,446] == 1):
+
+                if segmentacion_priori[i,j,446] == 1:
+                    #print('dentro')
+                    h,_=np.histogram(vol1[i-1:i+2,j-1:j+2,446-1:446+2],bins=27)
+                    etiqueta = NN(train_data_total, [h])[0]
+                    if etiqueta == 1:
+                        #print(f'pos: {i,j}')
+                        positive += 1
+                        minima2[i,j,446] = 2
+                else:
+                    #print('fuera')
+                    if vol1[i,j,446]>0.1 and vol1[i,j,446]<0.7:
+                        h,_=np.histogram(vol1[i-1:i+2,j-1:j+2,446-1:446+2],bins=27)
+                        etiqueta = NN(train_data_total, [h])[0]
+                        if etiqueta == 0:
+                            #print(f'neg: {i,j}')
+                            negative += 1
+                            minima2[i,j,446] = 1
+    return minima2
+    
+def preprocesamiento_total(vol):
+    # YOUR CODE HERE
+    def pre_total(vol_pre, volume1):
+        mask_binary = np.logical_and(vol_pre>0.2, vol_pre<1) # mascara binaria donde se cumple el umbral
+        mask = mask_binary * volume1 # mascara que tiene las intensidades originales
+        vol_pre_total = volume1 - mask
+        return vol_pre_total
+
+    def experimento2(vol, imprimir=True):
+        size_x, size_y, size_z = 5, 20, 5 # coronal el mayor
+        ee_exp2 = np.ones((size_x, size_y, size_z), dtype=bool)
+        vol_pre_exp2 = vol - opening(vol, footprint=ee_exp2) # original - apertura
+        vol_pre_total_exp2 = pre_total(vol_pre_exp2, vol)
+        return vol_pre_total_exp2
+    
+    vol_pre_total = experimento2(vol, False)
+    return vol_pre_total
+
+def postprocesamiento_total(vol):
+    # YOUR CODE HERE
+    def baseline(vol, ee1, ee2):
+        vol = binary_opening(vol, footprint=ee1)
+        vol = binary_dilation(vol, footprint=ee2)
+
+        size_x, size_y, size_z = 3, 10, 3 
+        ee3 = np.ones((size_x, size_y, size_z), dtype=bool)
+        vol = binary_closing( vol, footprint=ee3) # clausura para cerrar los huecos del hígado
+        return vol
+
+    def exp1(vol, imprimir=True):
+        #if imprimir: print('Exp. 1: el primer EE es una bola de tamaño 3 y el segundo EE es un cubo de tamaño 2')
+        ee1 = ball(3)
+        ee2 = cube(2)
+        vol1 = baseline(vol,ee1,ee2)
+        #if imprimir: print(f'Jaccard = {round(Jaccard_3D(vol1,segmen1),3)}') 
+        return vol1
+
+    def geodesic_dilatation(mask, E1,E2,max_iterations):
+        # YOUR CODE HERE
+        eroded = erosion(mask, footprint=E1)
+        result = eroded.copy()
+        for it in range(1, max_iterations+1):
+            dilated = dilation(result, footprint=E2)
+            new_result = np.logical_and(dilated, mask)
+            if np.array_equal(result, new_result):
+                break
+            result = new_result.copy()
+        iterations = it
+        result = result.astype(int)
+        return result,iterations
+
+    vol_post_total = exp1(vol, False)
+    vol_post_total, _ = geodesic_dilatation(vol_post_total,ball(8),ball(2),100) #esta función puede demorar en correr
+    return vol_post_total
+
+
+vol_val=nib.load(os.path.join('DB','valid','volume-10.nii.gz')).get_fdata()
+seg_val=nib.load(os.path.join('DB','valid','segmentation-10.nii.gz')).get_fdata()
+seg_total=Segmentacion(vol_val)
+
+
+seg_val = seg_val > 0
+
+
+print(f'El Jaccard es de {Jaccard_3D(seg_total, seg_val)}')
+plt.imshow(seg_total[:,:,446], cmap='gray')
+plt.axis('off')
+plt.show()
+
+
+assert len(np.unique(seg_total))==2, 'Solo deberían haber 2 etiquetas en su volumen'
+assert np.max(seg_total)==1, 'El maximo de su segmentación debería ser 1'
+assert Jaccard_3D(seg_total,seg_val)>0.49, 'Su experimentación debería superar el 0.51 de Jaccard, el baseline'
+
+
+vol_val=nib.load(os.path.join('DB','test','volume-7.nii.gz')).get_fdata()
+seg_val=nib.load(os.path.join('DB','test','segmentation-7.nii.gz')).get_fdata()
+seg_total=Segmentacion(vol_val)
+
+
+assert Jaccard_3D(seg_total,seg_val)>0.48, 'Su algoritmo final debería superar el baseline'
+
+
+print(f'El Jaccard es de {Jaccard_3D(final_segment, seg1)}')
+
+# Graficamos los resultados en 4 cortes axiales
+fig, axs = plt.subplots(4,2, figsize=(8,18)) # ancho, alto
+corte_axial1, corte_axial2, corte_axial3, corte_axial4 = 55, 60, 65, 69
+
+volumenes = [final_segment, seg1]
+nombres = ['Final segment', 'Segmentación GT']
+
+for j in range(2):
+    axs[0,j].imshow(volumenes[j][:,:,corte_axial1], cmap='gray')
+    axs[0,j].axis('off')
+    axs[0,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial1} \n')
+    
+    axs[1,j].imshow(volumenes[j][:,:,corte_axial2], cmap='gray')
+    axs[1,j].axis('off')
+    axs[1,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial2} \n')    
+
+    axs[2,j].imshow(volumenes[j][:,:,corte_axial3], cmap='gray')
+    axs[2,j].axis('off')
+    axs[2,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial3} \n')
+    
+    axs[3,j].imshow(volumenes[j][:,:,corte_axial4], cmap='gray')
+    axs[3,j].axis('off')
+    axs[3,j].set_title(f'{nombres[j]} \n Corte axial {corte_axial4} \n')    
+plt.show()
+
+
+from utils import *
+converter("Entrega 3")
+
+
