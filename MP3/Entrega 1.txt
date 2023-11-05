@@ -1,0 +1,604 @@
+import cv2
+from glob import glob
+import numpy as np
+import os
+
+# images train
+imgs_elefante_train=''
+imgs_caballo_train=''
+imgs_gato_train=''
+imgs_oveja_train=''
+imgs_perro_train=''
+# paths valid
+paths_elefante_valid=''
+paths_caballo_valid=''
+paths_gato_valid=''
+paths_oveja_valid=''
+paths_perro_valid=''
+# paths test
+paths_elefante_test=''
+paths_caballo_test=''
+paths_gato_test=''
+paths_oveja_test=''
+paths_perro_test=''
+
+# YOUR CODE HERE
+# Se obtienen los paths de train
+paths_elefante_train = glob(os.path.join('Dataset','Train','Elefante','*.jpeg'))
+paths_caballo_train = glob(os.path.join('Dataset','Train','Caballo','*.jpeg'))
+paths_gato_train = glob(os.path.join('Dataset','Train','Gato','*.jpeg'))
+paths_oveja_train = glob(os.path.join('Dataset','Train','Oveja','*.jpeg'))
+paths_perro_train = glob(os.path.join('Dataset','Train', 'Perro','*.jpeg'))
+
+# Para cada lista de paths, se obtienen las imagenes, se cambia el tamaño y se añaden a la lista de imágenes
+imgs_elefante_train=[]
+for path in paths_elefante_train:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_elefante_train.append(resized_img)
+imgs_elefante_train = np.array(imgs_elefante_train)
+
+imgs_caballo_train=[]
+for path in paths_caballo_train:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_caballo_train.append(resized_img)
+imgs_caballo_train = np.array(imgs_caballo_train)
+    
+imgs_gato_train=[]
+for path in paths_gato_train:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_gato_train.append(resized_img)
+imgs_gato_train = np.array(imgs_gato_train)
+
+imgs_oveja_train=[]
+for path in paths_oveja_train:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_oveja_train.append(resized_img)
+imgs_oveja_train = np.array(imgs_oveja_train)
+
+imgs_perro_train=[]
+for path in paths_perro_train:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_perro_train.append(resized_img)
+imgs_perro_train = np.array(imgs_perro_train)
+
+# Se obtienen los paths de valid
+paths_elefante_valid = glob(os.path.join('Dataset','Valid','Elefante','*.jpeg'))
+paths_caballo_valid = glob(os.path.join('Dataset','Valid','Caballo','*.jpeg'))
+paths_gato_valid = glob(os.path.join('Dataset','Valid','Gato','*.jpeg'))
+paths_oveja_valid = glob(os.path.join('Dataset','Valid','Oveja','*.jpeg'))
+paths_perro_valid = glob(os.path.join('Dataset','Valid','Perro','*.jpeg'))
+
+# Se obtienen los paths de test
+paths_elefante_test = glob(os.path.join('Dataset','Test','Elefante','*.jpeg'))
+paths_caballo_test = glob(os.path.join('Dataset','Test','Caballo','*.jpeg'))
+paths_gato_test = glob(os.path.join('Dataset','Test','Gato','*.jpeg'))
+paths_oveja_test = glob(os.path.join('Dataset','Test','Oveja','*.jpeg'))
+paths_perro_test = glob(os.path.join('Dataset','Test','Perro','*.jpeg'))
+
+
+import numpy as np
+assert len(imgs_elefante_train)+len(imgs_caballo_train)+len(imgs_gato_train)+len(imgs_oveja_train)+len(imgs_perro_train) !=0, 'No cargo ninguna imagen del dataset de entrenamiento'
+assert np.isclose(len(imgs_elefante_train),531,0.1), f'Deberia tener 531 imagenes en su vector de elefantes train, tiene {len(imgs_elefante_train)}'
+assert imgs_elefante_train[0].shape[0]==imgs_perro_train[0].shape[0], f'Las dimensiones de todas las imagenes en train deberian ser iguales'
+assert np.isclose(np.std(imgs_gato_train[0]),60.51,0.1),  'Usted no leyo o guardo bien sus imagenes'
+### BEGIN HIDDEN SOLUTIONS
+assert np.isclose(len(paths_elefante_test),274,0.1)
+### END HIDDEN SOLUTIONS
+
+
+# Usen esta celda para imprimir las estadisticas de su base de datos. 
+# Pueden usar el codigo de las tablas del primer miniproyecto
+
+print ("{:<8}             | {:<15}".format('Fold','Total images'))
+print ('------------------------------------------------------')
+print ("{:<20} | {:<15}".format('Train',len(paths_elefante_train+paths_perro_train+paths_caballo_train+paths_gato_train+paths_oveja_train)))
+print ("{:<20} | {:<15}".format('Valid',len(paths_elefante_valid+paths_perro_valid+paths_caballo_valid+paths_gato_valid+paths_oveja_valid)))
+print ("{:<20} | {:<15}".format('Test',len(paths_elefante_test+paths_perro_test+paths_caballo_test+paths_gato_test+paths_oveja_test)))
+#print ("{:<20} | {:<15}".format('Total BD ',len(paths_elefante_test)))
+
+print()
+
+print ("{:<8}             | {:<15}".format('Fold','Total images'))
+print ('------------------------------------------------------')
+print ("{:<20} | {:<15}".format('Train elefantes',len(paths_elefante_train)))
+print ("{:<20} | {:<15}".format('Valid elefantes',len(paths_elefante_valid)))
+print ("{:<20} | {:<15}".format('Test elefantes',len(paths_elefante_test)))
+
+print()
+
+print ("{:<8}             | {:<15}".format('Fold','Total images'))
+print ('------------------------------------------------------')
+print ("{:<20} | {:<15}".format('Train caballos',len(paths_caballo_train)))
+print ("{:<20} | {:<15}".format('Valid caballos',len(paths_caballo_valid)))
+print ("{:<20} | {:<15}".format('Test caballos',len(paths_caballo_test)))
+
+print()
+
+print ("{:<8}             | {:<15}".format('Fold','Total images'))
+print ('------------------------------------------------------')
+print ("{:<20} | {:<15}".format('Train gatos',len(paths_gato_train)))
+print ("{:<20} | {:<15}".format('Valid gatos',len(paths_gato_valid)))
+print ("{:<20} | {:<15}".format('Test gatos',len(paths_gato_test)))
+
+print()
+
+print ("{:<8}             | {:<15}".format('Fold','Total images'))
+print ('------------------------------------------------------')
+print ("{:<20} | {:<15}".format('Train ovejas',len(paths_oveja_train)))
+print ("{:<20} | {:<15}".format('Valid ovejas',len(paths_oveja_valid)))
+print ("{:<20} | {:<15}".format('Test ovejas',len(paths_oveja_test)))
+
+print()
+
+print ("{:<8}             | {:<15}".format('Fold','Total images'))
+print ('------------------------------------------------------')
+print ("{:<20} | {:<15}".format('Train perros',len(paths_perro_train)))
+print ("{:<20} | {:<15}".format('Valid perros',len(paths_perro_valid)))
+print ("{:<20} | {:<15}".format('Test perros',len(paths_perro_test)))
+
+
+def return_patches(im,size,num_patches):
+    '''''
+    param-im (array): Imagen de entrada
+    param-size (int): Tamaño del parche
+    param-num_patches (list): Lista de puntos (x,y)
+    '''''
+    resultado=[]
+    # YOUR CODE HERE
+    for x, y in num_patches:
+        parche = im[y:y+size,x:x+size]
+        resultado.append(parche)
+    return resultado
+
+
+from matplotlib import pyplot as plt
+
+im=imgs_gato_train[0]
+patch=return_patches(im,100,[[50,50]])[0]
+fig,ax=plt.subplots(2)
+ax[0].imshow(im)
+ax[0].axis('off')
+ax[1].imshow(patch)
+ax[1].axis('off')
+plt.show()
+
+assert patch.shape[0]==patch.shape[1], f'El parche deberia tener las mismas dimensiones {patch.shape[0]}x{patch.shape[0]} y tiene dimensiones {patch.shape[0]}x{patch.shape[1]}'
+assert patch.shape[0]==100, f'El parche deberia tener dimensiones 100x100 y es {patch.shape[0]}x{patch.shape[1]}'
+assert np.isclose(np.std(patch),np.std(im[50:50+100,50:50+100]),0.1), 'No la imagen en la posición que deberia'
+
+
+from skimage.color import rgb2gray 
+
+np.random.seed(42)
+parches_gatos=[] #parches de gatos
+r=np.random.randint(0,len(imgs_gato_train),size=10) #vector de indices de las imagenes a seleccionar
+# YOUR CODE HERE
+
+# se toman las 10 imágenes
+imgs_gato_seleccionadas = imgs_gato_train[r]
+
+# se toman las 3 coordenadas (x, y)
+coordenadas_parches = np.zeros(3, dtype=tuple)
+x = np.random.randint(50, 250+1, size=3)
+y = np.random.randint(50, 250+1, size=3)
+for i in range(3):
+    coordenadas_parches[i] = (x[i],y[i])
+
+# se obtienen los parches de cada imagen
+for img_gato in imgs_gato_seleccionadas:
+    parches = return_patches(img_gato,50,coordenadas_parches)
+    # cada parche se pasa a gris
+    parches_grises = [rgb2gray(parche_color) for parche_color in parches]
+    parches_gatos += parches_grises
+
+
+fig,ax=plt.subplots(6,5)
+c=0
+for i in range(6):
+    for j in range(5):
+        ax[i,j].imshow(parches_gatos[c],cmap='gray')
+        ax[i,j].axis('off')
+        c+=1
+plt.show()
+
+assert not(len(parches_gatos)==10 and len(parches_gatos[0])==3), 'Debe tener un solo vector de parches, no un vector de vectores'
+assert len(parches_gatos)==30, 'Deberia tener 30 parches, son 3 parches de 10 imagenes'
+assert parches_gatos[0].shape[0]==50, 'El parche debe tener un tamaño de 100x100'
+assert np.sum(parches_gatos[0])!=0, 'Sus parches no tienen contenido'
+assert len(parches_gatos[0].shape)==2, 'Sus parches deben ser grises'
+
+
+from skimage.filters import prewitt
+
+def select_patch_gradient(im,size):
+    '''''
+    param-im (array): Imagen de entrada
+    param-size (int): Tamaño del parche
+    '''''
+    # YOUR CODE HERE
+    # se obtiene el gradiente de la imagen
+    gradiente = prewitt(im)
+    # se obtienen las coordenadas de todos los posibles parches de la imagen
+    coordenadas_parches = []
+    for i in range(300//size):
+        for j in range(300//size):
+            coordenadas_parches.append((i*size,j*size))
+    coordenadas_parches = np.array(coordenadas_parches)
+    # se obtienen los parches del gradiente
+    parches_gradiente = return_patches(gradiente,size,coordenadas_parches)
+    # se encuentran los promedios de cada parche del gradiente
+    promedios = [np.mean(parche) for parche in parches_gradiente]
+    # se obtienen los indices de los 3 parches con mayor promedio
+    indices_mayores_tres = np.argsort(promedios)[-3:]
+    # se encuentran los 3 parches de la imagen original
+    parches_seleccionados = return_patches(im,size,coordenadas_parches[indices_mayores_tres])
+    respuesta = [rgb2gray(parche_color) for parche_color in parches_seleccionados]
+    return respuesta
+
+
+im=imgs_gato_train[0]
+patch_gradiente=select_patch_gradient(im,50)
+fig,ax=plt.subplots(4)
+ax[0].imshow(im)
+ax[0].axis('off')
+ax[1].imshow(patch_gradiente[0])
+ax[1].axis('off')
+ax[2].imshow(patch_gradiente[1])
+ax[2].axis('off')
+ax[3].imshow(patch_gradiente[2])
+ax[3].axis('off')
+plt.show()
+
+
+np.random.seed(42)
+r= '' #vector de indices de las imagenes a seleccionar
+parches_gatos_gradiente=[]
+# YOUR CODE HERE
+
+r=np.random.randint(0,len(imgs_gato_train),size=10) #vector de indices de las imagenes a seleccionar
+# se toman las 10 imágenes
+imgs_gato_seleccionadas = imgs_gato_train[r]
+# se obtienen los parches de dichas imagenes
+for imagen_gato in imgs_gato_seleccionadas:
+    parches_gatos_gradiente += select_patch_gradient(imagen_gato,50)
+
+
+fig,ax=plt.subplots(6,5)
+c=0
+for i in range(6):
+    for j in range(5):
+        ax[i,j].imshow(parches_gatos_gradiente[c],cmap='gray')
+        ax[i,j].axis('off')
+        c+=1
+plt.show()
+
+assert not(len(parches_gatos_gradiente)==10 and len(parches_gatos_gradiente[0])==3), 'Debe tener un solo vector de parches, no un vector de vectores'
+assert len(parches_gatos_gradiente)==30, 'Deberia tener 30 parches, son 3 parches de 10 imagenes'
+assert parches_gatos_gradiente[0].shape[0]==50, 'El parche debe tener un tamaño de 100x100'
+assert np.sum(parches_gatos_gradiente[0])!=0, 'Sus parches no tienen contenido'
+assert len(parches_gatos_gradiente[0].shape)==2, 'Sus parches deben ser grises'
+
+
+from skimage.feature import match_template
+
+def template_vector(im,templates):
+    '''''
+    param-im (array): Imagen de entrada
+    param-templates (array): Vector de templates
+    '''''
+    # YOUR CODE HERE
+    vector = []
+    for template in templates:
+        vector.append(np.max(match_template(rgb2gray(im), template)))
+    return vector
+
+
+im=imgs_gato_train[0]
+#gato 1
+v1_gato=template_vector(im,parches_gatos)
+v2_gato=template_vector(im,parches_gatos_gradiente)
+#gato 2
+im=imgs_gato_train[2]
+v3_gato=template_vector(im,parches_gatos)
+v4_gato=template_vector(im,parches_gatos_gradiente)
+#perro
+im=imgs_perro_train[1]
+v1_perro=template_vector(im,parches_gatos)
+v2_perro=template_vector(im,parches_gatos_gradiente)
+
+
+from skimage.color import rgb2gray
+assert len(v1_gato)==30, 'Las dimensiones del vector deben ser 30, uno por cada template'
+assert np.isclose(v1_gato[0],np.max(match_template(rgb2gray(im),parches_gatos[0])),0.1), 'La primera dimensión de su vector no correspoonde a al template matching del primer template'
+
+
+d_perro_gato1='' #distancia entre vector de perro y gato 1
+d_perro_gato2='' #distancia entre vector de perro y gato 2
+d_gato1_gato2='' #distancia entre vector de perro y gato 1
+# YOUR CODE HERE
+
+def distancia_euclidiana(vector1, vector2):
+    suma = 0
+    for i in range(len(vector1)):
+        suma += (vector1[i]-vector2[i])**2
+    return np.sqrt(suma)
+d_perro_gato1 = distancia_euclidiana(v1_perro, v1_gato)
+d_perro_gato2 = distancia_euclidiana(v1_perro, v3_gato)
+d_gato1_gato2 = distancia_euclidiana(v1_gato, v3_gato)
+
+
+print(d_perro_gato1)
+print(d_perro_gato2)
+print(d_gato1_gato2)
+
+assert d_perro_gato1>d_gato1_gato2, 'La distancia de el vectro de gato2 al perro debe ser menor que la del gato 1 al gato 2'
+
+
+parches_entrenamiento={}
+np.random.seed(42)
+llaves=['gato','elefante','perro','oveja','caballo']
+r2=np.random.randint(0,len(imgs_elefante_train),size=10)
+r3=np.random.randint(0,len(imgs_perro_train),size=10)
+r4=np.random.randint(0,len(imgs_oveja_train),size=10)
+r5=np.random.randint(0,len(imgs_caballo_train),size=10)
+
+# YOUR CODE HERE
+
+# función con el procedimiento de parches de gradiente
+def parches_train(r, imgs):
+    imgs_seleccionadas = imgs[r]
+    parches_gradiente = []
+    for img in imgs_seleccionadas:
+        parches_gradiente += select_patch_gradient(img,50)
+    return parches_gradiente
+
+# ya se tiene gato, solo se agrega
+parches_entrenamiento['gato'] = parches_gatos_gradiente
+# se toman los nuevos r e imgs
+rs = [r2, r3, r4, r5]
+imgs = [imgs_elefante_train, imgs_perro_train, imgs_oveja_train, imgs_caballo_train]
+# se obtienen los parches, que son los valores del diccionario
+values = [parches_train(rs[i], imgs[i]) for i in range(4)]
+# se añaden los resultados obtenidos al diccionario
+for i in range(4):
+    parches_entrenamiento[llaves[i+1]] = values[i]
+
+
+parches=parches_entrenamiento['perro']
+
+fig,ax=plt.subplots(6,5)
+c=0
+for i in range(6):
+    for j in range(5):
+        ax[i,j].imshow(parches[c],cmap='gray')
+        ax[i,j].axis('off')
+        c+=1
+plt.show()
+
+
+assert len(parches_entrenamiento.keys())==5, 'Debe tener 5 llaves su diccionario'
+assert 'perro' in parches_entrenamiento.keys(), 'Su diccionario debe tener la llave perro'
+assert 'gato' in parches_entrenamiento.keys(), 'Su diccionario debe tener la llave gato'
+assert len(parches_entrenamiento['perro'])==30, 'Debe tener 30 templates de perro en su diccionario'
+assert parches_entrenamiento['perro'][0].shape[0]==50, 'Sus parches deben ser 50x50'
+
+
+def vector_final(dict_entrenamiento,im):
+    '''''
+    param-dict_entrenamiento (dict): Diccionario de parches de entrenamiento
+    param-im (array): Imagen de entrada
+    '''''
+    # YOUR CODE HERE
+    vector = []
+    orden_clases = ['gato','elefante','perro','oveja','caballo']
+    for clase in orden_clases:
+        parches_clase = dict_entrenamiento[clase]
+        vector += template_vector(im, parches_clase)
+    respuesta = np.array(vector)  
+    return respuesta
+
+
+im=imgs_gato_train[0]
+v_descriptor=vector_final(parches_entrenamiento,im)
+
+assert len(v_descriptor)==150, 'Las dimensiones del descriptor deberian ser 150, 30 por cada clase'
+assert template_vector(im,parches_entrenamiento['perro'])[0]==v_descriptor[60], 'El vector de descriptor final no se encuentra ordenado como se especificó'
+
+
+class NN_classifier:
+    def __init__(self,descriptor):
+        '''
+        :param descriptor (dict): Diccionario de templates de entrenamiento.
+        '''
+        self.descriptor = '' #atributo del diccionario de templates
+        self.vectores='' #atributo del vector de descriptores de entrenamiento
+        self.etiquetas='' #atributo del vector de etiquetas
+        # YOUR CODE HERE
+        self.descriptor = descriptor
+        self.vectores = []
+        self.etiquetas = []
+        
+    def fit(self,X,y):
+        '''
+        :param X: Imagenes de entrenamiento
+        :param y: Labels de las imagenes
+        :return: self (Trained descriptor)
+        '''
+        # YOUR CODE HERE
+        for imagen, etiqueta in zip(X,y):
+            vector = vector_final(self.descriptor, imagen)
+            self.vectores.append(vector)
+            self.etiquetas.append(etiqueta)
+        return self
+    
+    def vector_final(self,dict_entrenamiento,im):
+        '''''
+        param-dict_entrenamiento (dict): Diccionario de parches de entrenamiento
+        param-im (array): Imagen de entrada
+        '''''
+        # YOUR CODE HERE
+        vector = []
+        orden_clases = ['gato','elefante','perro','oveja','caballo']
+        for clase in orden_clases:
+            parches_clase = dict_entrenamiento[clase]
+            vector += template_vector(im, parches_clase)
+        respuesta = np.array(vector)  
+        return respuesta
+    
+    def predict(self,X):
+        '''
+        :param X (array): Imagenes a predecir
+        :return: Arreglo de etiquetas predichas
+        '''
+        # YOUR CODE HERE
+        etiqueta = np.zeros(len(X))
+        for n, imagen in enumerate(X):
+            # primero hallar el descriptor de la imagen
+            descriptor_imagen = vector_final(self.descriptor, imagen)
+            # encontrar el minimo de distancia                
+            distancia_minima = np.inf
+            etiqueta_minima = None
+            for j, train_vector in enumerate(self.vectores):
+                # calculo de distancia
+                distancia = np.linalg.norm(train_vector - descriptor_imagen)
+                # actualizacion en caso de ser la menor distancia
+                if distancia < distancia_minima:
+                    distancia_minima = distancia
+                    etiqueta[n] = self.etiquetas[j]
+        return etiqueta
+
+
+dict_etiquetas={}
+etiqueta_gato='' #vector de etiquetas de gato 1
+etiqueta_perro='' #vector de etiquetas de perro 2
+etiqueta_elefante='' #vector de etiquetas de elefante 3
+etiqueta_oveja='' #vector de etiquetas de oveja 4
+etiqueta_caballo='' #vector de etiquetas de caballo 5
+
+imagenes_gato_train='' #vector de imagenes de gato
+imagenes_perro_train='' #vector de imagenes de perro
+imagenes_elefante_train='' #vector de imagenes de elefante
+imagenes_oveja_train='' #vector de imagenes de oveja
+imagenes_caballo_train='' #vector de imagenes de caballo
+
+# YOUR CODE HERE
+dict_etiquetas = dict(zip(['gato','perro','elefante','oveja','caballo'],[1,2,3,4,5]))
+print(dict_etiquetas)
+
+etiqueta_gato = [1]*50
+etiqueta_perro = [2]*50
+etiqueta_elefante = [3]*50
+etiqueta_oveja = [4]*50
+etiqueta_caballo = [5]*50
+
+imagenes_gato_train = imgs_gato_train[np.random.randint(0,len(imgs_gato_train),size=50)]
+imagenes_perro_train = imgs_perro_train[np.random.randint(0,len(imgs_perro_train),size=50)]
+imagenes_elefante_train = imgs_elefante_train[np.random.randint(0,len(imgs_elefante_train),size=50)]
+imagenes_oveja_train = imgs_oveja_train[np.random.randint(0,len(imgs_oveja_train),size=50)]
+imagenes_caballo_train = imgs_caballo_train[np.random.randint(0,len(imgs_caballo_train),size=50)]
+
+
+assert len(dict_etiquetas.keys())==5,'Deben haber 5 diferentes numeros como etiquetas para sus clases'
+assert len(np.unique(dict_etiquetas.keys())), 'Solo deben haber 5 etiquetas'
+assert dict_etiquetas['gato']==etiqueta_gato[0], 'La etiqueta de gato en el diccionario debe ser igual que en su vector de etiquetas'
+
+
+model=NN_classifier(parches_entrenamiento)
+model.fit(imagenes_gato_train,etiqueta_gato)
+model.fit(imagenes_perro_train,etiqueta_perro)
+model.fit(imagenes_elefante_train,etiqueta_elefante)
+model.fit(imagenes_oveja_train,etiqueta_oveja)
+model.fit(imagenes_caballo_train,etiqueta_caballo)
+
+
+assert len(model.vectores)==len(imagenes_gato_train)+len(imagenes_perro_train)+len(imagenes_elefante_train)+len(imagenes_oveja_train)+len(imagenes_caballo_train), 'La cantidad de imagenes de entrnamiento y los vectores de entrenamiento no coinsiden'
+assert len(model.etiquetas)==len(model.vectores),'La cantidad de vectores y la cantidad de etiquetas no coinsiden'
+assert len(model.vectores[0])==150, f'Las dimensiones del descriptor deben ser 150 y son {len(model.vectores[0])}'
+
+
+im=imgs_gato_train[0]
+prediccion=model.predict([im])
+
+
+assert len(prediccion) ==1, 'Solo deberia haber una unica predicción para una unica imagen'
+assert prediccion[0] in dict_etiquetas.values(), 'La predicción no se encuentra en el diccionario de etiquetas'
+
+
+from sklearn.metrics import f1_score, precision_score, recall_score
+
+# VALIDACIÓN
+
+# Primero tomar 50 imagenes por cada carpeta
+paths_gato_subset = np.array(paths_gato_valid)[np.random.randint(0, len(paths_gato_valid), size=50)]
+paths_perro_subset = np.array(paths_perro_valid)[np.random.randint(0, len(paths_perro_valid), size=50)]
+paths_elefante_subset = np.array(paths_elefante_valid)[np.random.randint(0, len(paths_elefante_valid), size=50)]
+paths_oveja_subset = np.array(paths_oveja_valid)[np.random.randint(0, len(paths_oveja_valid), size=50)]
+paths_caballo_subset = np.array(paths_caballo_valid)[np.random.randint(0, len(paths_caballo_valid), size=50)]
+
+paths_valid = np.concatenate([paths_gato_subset, paths_perro_subset, paths_elefante_subset, 
+                              paths_oveja_subset, paths_caballo_subset])
+etiquetas_valid = [dict_etiquetas['gato']]*50 + [dict_etiquetas['perro']]*50 + [dict_etiquetas['elefante']]*50 + [dict_etiquetas['oveja']]*50 + [dict_etiquetas['caballo']]*50
+
+# se cargan las imagenes
+imgs_valid = []
+for path in paths_valid:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_valid.append(resized_img)
+imgs_valid = np.array(imgs_valid)
+
+# se obtienen las predicciones del modelo
+predictions_valid = model.predict(imgs_valid) 
+
+
+# encontrar métricas
+f1_valid = f1_score(etiquetas_valid, predictions_valid, average='weighted')
+precision_valid = precision_score(etiquetas_valid, predictions_valid, average='weighted')
+cobertura_valid = recall_score(etiquetas_valid, predictions_valid, average='weighted')
+print(f'El f1 de validación es {f1_valid}')
+print(f'La precision de validación es {precision_valid}')
+print(f'La cobertura de validación es {cobertura_valid}')
+
+
+#TEST
+
+# Primero tomar 50 imagenes por cada carpeta
+paths_gato_subset = np.array(paths_gato_test)[np.random.randint(0, len(paths_gato_test), size=50)]
+paths_perro_subset = np.array(paths_perro_test)[np.random.randint(0, len(paths_perro_test), size=50)]
+paths_elefante_subset = np.array(paths_elefante_test)[np.random.randint(0, len(paths_elefante_test), size=50)]
+paths_oveja_subset = np.array(paths_oveja_test)[np.random.randint(0, len(paths_oveja_test), size=50)]
+paths_caballo_subset = np.array(paths_caballo_test)[np.random.randint(0, len(paths_caballo_test), size=50)]
+
+paths_test = np.concatenate([paths_gato_subset, paths_perro_subset, paths_elefante_subset, 
+                              paths_oveja_subset, paths_caballo_subset])
+etiquetas_test = [dict_etiquetas['gato']]*50 + [dict_etiquetas['perro']]*50 + [dict_etiquetas['elefante']]*50 + [dict_etiquetas['oveja']]*50 + [dict_etiquetas['caballo']]*50
+# se cargan las imageens
+imgs_test = []
+for path in paths_test:
+    img = cv2.imread(path)
+    resized_img = cv2.resize(img, (300,300))
+    imgs_test.append(resized_img)
+imgs_test = np.array(imgs_test)
+
+# se obtienen las predicciones del modelo
+predictions_test = model.predict(imgs_test) 
+
+
+# encontrar métricas
+f1_test = f1_score(etiquetas_test, predictions_test, average='weighted')
+precision_test = precision_score(etiquetas_test, predictions_test, average='weighted')
+cobertura_test = recall_score(etiquetas_test, predictions_test, average='weighted')
+print(f'El f1 de test es {f1_test}')
+print(f'La precision de test es {precision_test}')
+print(f'La cobertura de test es {cobertura_test}')
+
+
+from utils import *
+converter("Entrega 1")
+
+
