@@ -692,11 +692,11 @@ experimento_shape(valid_images,valid_annots,10,10,4,'valid','anotaciones=10,pixe
 
 # TEST
 
-print('Se elige el mejor modelo y se hace prueba con el dataset de test')
+print('Se elige el mejor modelo encontrado durante nuestra experimentación y se hace prueba con el dataset de test')
 
 test_images, test_annots = load_images_global('Test', 50)
 
-experimento_color(test_images,test_annots,'joint',5,'rgb',1,'test','joint+rgb')
+experimento_texture(test_images, test_annots, 13, 3, 'test', '13 textones')
 
 
 from utils import *
