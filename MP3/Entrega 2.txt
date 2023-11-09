@@ -701,15 +701,19 @@ test_images_false = test_images[annots!=preds]
 num_false = len(test_images_false)
 
 print(f'De un total de {len(test_images)}, {num_false} fueron predichas incorrectamente.')
-
+print(f'A continuación se muestran 3 imágenes clasificadas erróneamente de cada clase de test')
 
 def ejemplos_incorrectos_clase(test_images, annots, preds, nombre_clase):
     dict_etiquetas = dict(zip(['gato','perro','elefante','oveja','caballo'],[1,2,3,4,5]))
     num_clase = dict_etiquetas[nombre_clase]
-    respuesta = test_images[(annots == np.array([num_clase]*len(annots))) & (annots != preds),:,:,:]
-    return respuesta
+    r = (annots == np.array([num_clase]*len(annots))) & (annots != preds)
+    pred = preds[r]
+    respuesta = test_images[r]
+    return respuesta, pred
 
-def graficar_imagenes(lista_imagenes):
+def graficar_imagenes(lista_imagenes, pred):
+    
+    dict_etiquetas = dict(zip([1,2,3,4,5],['gato','perro','elefante','oveja','caballo']))
     
     num_imagenes = min(len(lista_imagenes), 3)
     fig, axs = plt.subplots(1, num_imagenes, figsize=(5 * num_imagenes, 5))
@@ -719,15 +723,15 @@ def graficar_imagenes(lista_imagenes):
 
     for i in range(num_imagenes):
         axs[i].imshow(lista_imagenes[i])
+        axs[i].text(0, 20, dict_etiquetas[pred[i]], color='red', fontsize=14)
         axs[i].axis('off')  
-
     plt.show()
 
 animales = ['gato', 'perro', 'elefante', 'oveja', 'caballo']
 
 for animal_name in animales:
-    animal_false = ejemplos_incorrectos_clase(test_images, annots, preds, animal_name)
-    graficar_imagenes(animal_false)
+    animal_false, pred = ejemplos_incorrectos_clase(test_images, annots, preds, animal_name)
+    graficar_imagenes(animal_false, pred)
 
 
 from utils import *
