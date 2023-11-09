@@ -86,17 +86,18 @@ def calculate_filter_response(img, filters):
     '''
     
     # se convierte la imagen a escala de grises
-    img = rgb2gray(img)
+    img1 = img.copy()
+    img1 = rgb2gray(img1)
     
     # se calcula la cantidad de filtros (19)
     num_filters = filters.shape[2]
     
     # se crea el vector de respuesta de dimensiones (W*H, N)
-    flattened_response = np.empty((img.shape[0]*img.shape[1], num_filters))
+    flattened_response = np.empty((img1.shape[0]*img1.shape[1], num_filters))
 
     # por cada filtro se calcula la respuesta y se agrega al vector
     for i in range(num_filters):
-        filter_response = match_template(img, filters[:,:,i], pad_input=True)
+        filter_response = match_template(img1, filters[:,:,i], pad_input=True)
         flattened_response[:, i] = filter_response.ravel()
 
     return flattened_response
@@ -201,8 +202,9 @@ train_texture_route = '' #ruta donde quieren guardar sus descriptores y labels
 # YOUR CODE HERE
 
 def load_images(nombre_carpeta, nombre_clase, cantidad=10):
+    np.random.seed(27)
     paths = np.random.choice(glob(os.path.join('Dataset', nombre_carpeta, nombre_clase,'*.jpeg')),size=cantidad,replace=False)
-    imgs = np.array([cv2.resize(cv2.imread(path),(300,300)) for path in paths])
+    imgs = np.array([cv2.resize(io.imread(path),(300,300)) for path in paths])
     return imgs
 
 def load_images_global(nombre_carpeta, cantidad=10):
@@ -500,14 +502,6 @@ assert not np.isclose(np.std(shape_desc),0,0.001),f'su funcion retorna descripto
 assert os.path.isfile(train_shape_route),'no se está guardando el archivo'
 
 
-from sklearn.metrics import f1_score, precision_score, recall_score
-
-# 5. EXPERIMENTACIÓN
-
-# VALIDACIÓN:
-
-# 5.1. TEXTURA:
-
 def get_pixel_responses(images, route):
     if os.path.exists(route) and os.path.getsize(route) > 0:
         #print('existe')
@@ -522,6 +516,37 @@ def get_pixel_responses(images, route):
             np.save(f, pixel_responses)
             
     return np.array(pixel_responses)
+
+# se obtienen sets de 250 imagenes de train
+train_images, train_annots = load_images_global('Train', 50)
+        
+# se calcula la respuesta global
+pixel_responses_route = os.path.join('pixel_responses.npy')    
+pixel_responses = get_pixel_responses(train_images, pixel_responses_route)
+
+
+
+from sklearn.metrics import f1_score, precision_score, recall_score
+
+f1_manual = lambda p, c: 2*p*c/(p+c)
+
+def metricas(annots, predictions, carpeta='None', nombre_exp='None'):
+    precision = precision_score(annots, predictions, average='weighted')
+    cobertura = recall_score(annots, predictions, average='weighted')
+    f1 = f1_manual(precision, cobertura)
+    print(f'El f1 de {carpeta} del exp {nombre_exp} es {f1}')
+    print(f'La precision de {carpeta} del exp {nombre_exp} es {precision}')
+    print(f'La cobertura de {carpeta} del exp {nombre_exp} es {cobertura}')
+
+
+# 5. EXPERIMENTACIÓN
+
+# VALIDACIÓN:
+
+# se obtienen sets de 250 imagenes de valid
+valid_images, valid_annots = load_images_global('Valid', 50)
+
+# 5.1. TEXTURA:
 
 def texture_exp(images, labels, route, textons, responses):
     '''
@@ -551,7 +576,7 @@ def texture_exp(images, labels, route, textons, responses):
 
 
 def experimento_texture(images, annots, num_textons, num_exp, 
-                      carpeta:str, nombre_exp:str, stats=True):
+                      carpeta:str, nombre_exp:str):
     
     print(f'\nExperimento con textura #{num_exp}: {nombre_exp}')
     
@@ -568,24 +593,7 @@ def experimento_texture(images, annots, num_textons, num_exp,
     model.fit(texture_desc, annots)
     predictions = model.predict(new_desc)
     
-    if stats:
-        f1 = f1_score(annots, predictions, average='weighted')
-        precision = precision_score(annots, predictions, average='weighted')
-        cobertura = recall_score(annots, predictions, average='weighted')
-        print(f'El f1 de {carpeta} del exp {nombre_exp} es {f1}')
-        print(f'La precision de {carpeta} del exp {nombre_exp} es {precision}')
-        print(f'La cobertura de {carpeta} del exp {nombre_exp} es {cobertura}')
-
-
-# se obtienen sets de 250 imagenes de train
-train_images, train_annots = load_images_global('Train', 50)
-        
-# se calcula la respuesta global
-pixel_responses_route = os.path.join('pixel_responses.npy')    
-pixel_responses = get_pixel_responses(train_images, pixel_responses_route)
-
-# se obtienen sets de 250 imagenes de valid
-valid_images, valid_annots = load_images_global('Valid', 50)
+    metricas(annots, predictions, carpeta, nombre_exp)
 
 
 # EXP 1:
@@ -601,13 +609,11 @@ experimento_texture(valid_images, valid_annots, 13, 3, 'valid', '13 textones')
 experimento_texture(valid_images, valid_annots, 17, 4, 'valid', '17 textones')
 
 
-# se podría tomar una mayor muestra para pixel_response_global
-
 
 # 5.2 COLOR
 
 def experimento_color(images, annots, hist_type, space_bins, color_space, num_exp, 
-                      carpeta:str, nombre_exp:str, stats=True):
+                      carpeta:str, nombre_exp:str):
     
     print(f'\nExperimento con color #{num_exp}: {nombre_exp}')
     
@@ -621,14 +627,8 @@ def experimento_color(images, annots, hist_type, space_bins, color_space, num_ex
     model = NN_classifier()
     model.fit(color_desc, annots)
     predictions = model.predict(new_desc)
-    
-    if stats:
-        f1 = f1_score(annots, predictions, average='weighted')
-        precision = precision_score(annots, predictions, average='weighted')
-        cobertura = recall_score(annots, predictions, average='weighted')
-        print(f'El f1 de {carpeta} del exp {nombre_exp} es {f1}')
-        print(f'La precision de {carpeta} del exp {nombre_exp} es {precision}')
-        print(f'La cobertura de {carpeta} del exp {nombre_exp} es {cobertura}')
+
+    metricas(annots, predictions, carpeta, nombre_exp)
     
 
 # EXP 1:
@@ -653,7 +653,7 @@ experimento_color(valid_images,valid_annots,'concat',5,'lab',6,'valid','concat+l
 # 5.3 FORMA
 
 def experimento_shape(images, annots, param1, param2, num_exp, 
-                      carpeta:str, nombre_exp:str, stats=True):
+                      carpeta:str, nombre_exp:str, ret=False):
     
     print(f'\nExperimento con forma #{num_exp}: {nombre_exp}')
     
@@ -667,27 +667,24 @@ def experimento_shape(images, annots, param1, param2, num_exp,
     model = NN_classifier()
     model.fit(shape_desc, annots)
     predictions = model.predict(new_desc)
+
+    metricas(annots, predictions, carpeta, nombre_exp)
     
-    if stats:
-        f1 = f1_score(annots, predictions, average='weighted')
-        precision = precision_score(annots, predictions, average='weighted')
-        cobertura = recall_score(annots, predictions, average='weighted')
-        print(f'El f1 de {carpeta} del exp {nombre_exp} es {f1}')
-        print(f'La precision de {carpeta} del exp {nombre_exp} es {precision}')
-        print(f'La cobertura de {carpeta} del exp {nombre_exp} es {cobertura}')
-        
+    if ret: return annots, predictions
+    
+valor1, valor2 = 14, 4
         
 # EXP 1:
-experimento_shape(valid_images,valid_annots,13,10,1,'valid','anotaciones=13,pixeles_por_celda=10')
+experimento_shape(valid_images,valid_annots,valor1,valor2,1,'valid',f'orientaciones={valor1},pixeles_por_celda={valor2}')
 
 # EXP 2:
-experimento_shape(valid_images,valid_annots,13,13,2,'valid','anotaciones=13,pixeles_por_celda=13')
+experimento_shape(valid_images,valid_annots,valor1,valor1,2,'valid',f'orientaciones={valor1},pixeles_por_celda={valor1}')
 
 # EXP 3:
-experimento_shape(valid_images,valid_annots,10,13,3,'valid','anotaciones=10,pixeles_por_celda=13')
+experimento_shape(valid_images,valid_annots,valor2,valor1,3,'valid',f'orientaciones={valor2},pixeles_por_celda={valor1}')
 
 # EXP 4:
-experimento_shape(valid_images,valid_annots,10,10,4,'valid','anotaciones=10,pixeles_por_celda=10')
+experimento_shape(valid_images,valid_annots,valor2,valor2,4,'valid',f'orientaciones={valor2},pixeles_por_celda={valor2}')
 
 
 # TEST
@@ -696,7 +693,41 @@ print('Se elige el mejor modelo encontrado durante nuestra experimentación y se
 
 test_images, test_annots = load_images_global('Test', 50)
 
-experimento_texture(test_images, test_annots, 13, 3, 'test', '13 textones')
+annots, preds = experimento_shape(test_images,test_annots,valor1,valor2,1,'valid',f'orientaciones={valor1},pixeles_por_celda={valor2}', ret=True)
+
+test_images_false = test_images[annots!=preds]
+
+
+num_false = len(test_images_false)
+
+print(f'De un total de {len(test_images)}, {num_false} fueron predichas incorrectamente.')
+
+
+def ejemplos_incorrectos_clase(test_images, annots, preds, nombre_clase):
+    dict_etiquetas = dict(zip(['gato','perro','elefante','oveja','caballo'],[1,2,3,4,5]))
+    num_clase = dict_etiquetas[nombre_clase]
+    respuesta = test_images[(annots == np.array([num_clase]*len(annots))) & (annots != preds),:,:,:]
+    return respuesta
+
+def graficar_imagenes(lista_imagenes):
+    
+    num_imagenes = min(len(lista_imagenes), 3)
+    fig, axs = plt.subplots(1, num_imagenes, figsize=(5 * num_imagenes, 5))
+
+    if num_imagenes == 1:
+        axs = [axs]
+
+    for i in range(num_imagenes):
+        axs[i].imshow(lista_imagenes[i])
+        axs[i].axis('off')  
+
+    plt.show()
+
+animales = ['gato', 'perro', 'elefante', 'oveja', 'caballo']
+
+for animal_name in animales:
+    animal_false = ejemplos_incorrectos_clase(test_images, annots, preds, animal_name)
+    graficar_imagenes(animal_false)
 
 
 from utils import *
